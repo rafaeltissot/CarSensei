@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarSensei</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #0f172a;
+    --muted: #475569;
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --green: #16a34a;
+    --amber: #d97706;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+    color: #fff;
+    padding: 56px 24px 48px;
+    text-align: center;
+  }
+  header .badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.14);
+    color: #bfdbfe;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  header h1 {
+    margin: 0 0 12px;
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  header p {
+    max-width: 680px;
+    margin: 0 auto 24px;
+    color: #e2e8f0;
+    font-size: 18px;
+  }
+  .nav-pills {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .nav-pills a {
+    text-decoration: none;
+    padding: 10px 18px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .btn-primary {
+    background: #3b82f6;
+    color: #fff;
+  }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+  }
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 40px 20px 72px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+    margin-bottom: 36px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  }
+  .card h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    color: var(--text);
+  }
+  .card p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  h2 {
+    font-size: 24px;
+    margin: 36px 0 16px;
+    color: var(--text);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  th, td {
+    text-align: left;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  th {
+    background: #f8fafc;
+    font-weight: 700;
+    color: var(--text);
+  }
+  footer {
+    text-align: center;
+    padding: 28px 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 14px;
+  }
+  footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <span class="badge">iOS 17+ • Apple CarPlay • Vgate vLinker MC+ BLE</span>
+  <h1>🥋 CarSensei</h1>
+  <p>Telemetria em tempo real, diagnóstico de todos os módulos em linguagem simples, pressão dos pneus e auditoria de quilometragem para qualquer carro com OBD-II, usando o scanner Vgate vLinker MC+.</p>
+  <div class="nav-pills">
+    <a class="btn-primary" href="#funcionalidades">Recursos</a>
+    <a class="btn-secondary" href="#seguranca-koeo">Segurança KOEO</a>
+    <a class="btn-secondary" href="privacidade/">Política de Privacidade</a>
+  </div>
+</header>
+
+<main>
+  <h2 id="funcionalidades">✨ Principais Diferenciais</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>🌡️ Guardião Térmico</h3>
+      <p>Acompanha a temperatura do motor (PID <code>01 05</code>) e, quando o módulo do câmbio informa, a do óleo do câmbio automático/CVT, e mostra um alerta na tela antes de superaquecer.</p>
+    </div>
+    <div class="card">
+      <h3>👤 Dupla Visão: Cliente vs. Mecânico</h3>
+      <p>Alterne entre a <strong>Visão Cliente</strong> (semáforo "Posso continuar dirigindo?" e dicas contra orçamentos abusivos) e a <strong>Visão Mecânico</strong> (UDS <code>19 02</code>, máscaras de status e snapshots <code>19 04</code>).</p>
+    </div>
+    <div class="card">
+      <h3>🛡️ Auditoria de Quilometragem</h3>
+      <p>Compara o KM do painel com o que os módulos do carro guardam (odômetro do câmbio, registros de falha <code>19 04</code>, distância desde a última limpeza <code>01 31</code>) e com o chassi (VIN) de cada módulo. Só aprova o que conseguiu ler.</p>
+    </div>
+    <div class="card">
+      <h3>🛞 Pneus (TPMS)</h3>
+      <p>Procura o módulo de monitoramento dos pneus no barramento e mostra pressão, temperatura e ID de cada sensor, quando o carro tem TPMS.</p>
+    </div>
+    <div class="card">
+      <h3>⛽ Consumo Real &amp; Viagens</h3>
+      <p>Consumo instantâneo (<code>km/L</code> e <code>L/h</code>), média da viagem e histórico, com o percentual de etanol (<code>PID 01 52</code>) quando a ECU informa. Relatório em PDF de cada viagem.</p>
+    </div>
+    <div class="card">
+      <h3>🚗 Apple CarPlay</h3>
+      <p>Os indicadores principais e os alertas na central multimídia do carro.</p>
+    </div>
+  </div>
+
+  <h2 id="seguranca-koeo">🔒 Proteção Veicular e Trava KOEO</h2>
+  <div class="card" style="margin-bottom: 32px;">
+    <h3>Limpeza de Falhas Somente com Ignição Ligada e Motor Desligado (0 RPM)</h3>
+    <p>Enviar comandos de reset (<code>UDS 14 FF FF FF</code> ou <code>OBD 04</code>) com o motor girando ou com o carro em movimento pode interromper momentaneamente o controle hidráulico do câmbio CVT e do módulo ABS/ESP. Por isso, o <strong>CarSensei</strong> verifica em tempo real a rotação (<code>01 0C</code>) e a velocidade (<code>01 0D</code>), permitindo apagar códigos exclusivamente na condição <strong>KOEO (Key On, Engine Off — Ignição Ligada, 0 RPM e 0 km/h)</strong>.</p>
+  </div>
+
+  <h2>🚘 Compatibilidade</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Detalhes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Veículos</strong></td>
+        <td>Carros com tomada OBD-II e rede <code>ISO 15765-4 CAN</code> (a maioria dos carros a partir de 2010). O app identifica o carro pelo que ele informa (chassi, ECU) e só mostra os recursos que o carro responder.</td>
+      </tr>
+      <tr>
+        <td><strong>Scanner</strong></td>
+        <td><strong>Vgate vLinker MC+ (Bluetooth LE)</strong> para todos os recursos, incluindo os módulos além do motor. Scanners ELM327 Bluetooth LE comuns funcionam no modo básico (motor e consumo).</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+
+<footer>
+  <p>© 2026 João Rafael Tissot · <a href="privacidade/">Política de Privacidade</a> · <a href="mailto:rafaeltissot@hotmail.com">Contato &amp; Suporte</a></p>
+</footer>
+</body>
+</html>

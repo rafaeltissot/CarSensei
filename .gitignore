@@ -1,0 +1,16 @@
+# Xcode / build
+DerivedData/
+build/
+.build-device/
+.qa-build*/
+*.xcactivitylog
+*.log
+
+# Sistema
+.DS_Store
+xcuserdata/
+*.xcuserstate
+
+# Artefatos de QA local (logs do aparelho, capturas)
+.qa-device-data/
+.qa-shots/

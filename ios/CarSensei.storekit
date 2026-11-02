@@ -1,0 +1,50 @@
+{
+  "identifier" : "CS000001",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "39.90",
+      "familyShareable" : false,
+      "internalID" : "6770000001",
+      "localizations" : [
+        { "description" : "Acesso vitalício ao CarSensei", "displayName" : "Vitalício", "locale" : "pt_BR" }
+      ],
+      "productID" : "com.tissot.CarSensei.vitalicio",
+      "referenceName" : "Vitalício",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "pt_BR",
+    "_storefront" : "BRA"
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "22000001",
+      "localizations" : [],
+      "name" : "CarSensei Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "19.90",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6770000002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            { "description" : "Acesso anual ao CarSensei", "displayName" : "Anual", "locale" : "pt_BR" }
+          ],
+          "productID" : "com.tissot.CarSensei.anual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Anual",
+          "subscriptionGroupID" : "22000001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        }
+      ]
+    }
+  ],
+  "version" : { "major" : 4, "minor" : 0 }
+}
