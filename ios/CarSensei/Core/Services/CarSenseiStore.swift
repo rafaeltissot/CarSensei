@@ -229,6 +229,34 @@ public final class CarSenseiStore: ObservableObject {
         }
     }
 
+    /// Exclui veículos selecionados do histórico e suas falhas arquivadas associadas.
+    public func deleteConnectedVehicles(at offsets: IndexSet) {
+        let removedVINs = offsets.compactMap { idx -> String? in
+            guard connectedVehiclesHistory.indices.contains(idx) else { return nil }
+            return connectedVehiclesHistory[idx].vin
+        }
+        connectedVehiclesHistory.remove(atOffsets: offsets)
+        if let data = try? JSONEncoder().encode(connectedVehiclesHistory) {
+            UserDefaults.standard.set(data, forKey: vehiclesHistoryKey)
+        }
+        if !removedVINs.isEmpty {
+            archivedSnapshots.removeAll { fault in
+                guard let fVin = fault.vehicleVIN else { return false }
+                return removedVINs.contains(fVin)
+            }
+            if let data = try? JSONEncoder().encode(archivedSnapshots) {
+                UserDefaults.standard.set(data, forKey: archivedFaultsKey)
+            }
+        }
+    }
+
+    /// Limpa completamente o histórico de veículos conectados e falhas de outros veículos.
+    public func clearConnectedVehiclesHistory() {
+        connectedVehiclesHistory.removeAll()
+        UserDefaults.standard.removeObject(forKey: vehiclesHistoryKey)
+        clearOtherVehiclesArchivedFaults()
+    }
+
     // MARK: - Gauge Customization
 
     public func isGaugeEnabled(_ id: CockpitGaugeID) -> Bool {
@@ -762,11 +790,21 @@ public final class CarSenseiStore: ObservableObject {
         }
     }
 
-    /// Remove do arquivo apenas as falhas de outros veículos / leituras antigas sem VIN, preservando o carro atual.
+    /// Remove do arquivo apenas as falhas de outros veículos / leituras antigas sem VIN, preservando o carro atual,
+    /// e sincroniza o histórico de veículos para que nada de outros veículos permaneça.
     public func clearOtherVehiclesArchivedFaults() {
+        let currentVIN = OBDUDSParser.normalizedVIN(vehicleIdentity.vin)
         archivedSnapshots = archivedFaultsForCurrentVehicle
         if let data = try? JSONEncoder().encode(archivedSnapshots) {
             UserDefaults.standard.set(data, forKey: archivedFaultsKey)
+        }
+        if let currentVIN {
+            connectedVehiclesHistory.removeAll(where: { $0.vin != currentVIN })
+        } else {
+            connectedVehiclesHistory.removeAll()
+        }
+        if let data = try? JSONEncoder().encode(connectedVehiclesHistory) {
+            UserDefaults.standard.set(data, forKey: vehiclesHistoryKey)
         }
     }
 

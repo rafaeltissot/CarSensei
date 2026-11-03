@@ -124,76 +124,16 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // MARK: - Diagnóstico & Visualização
-                Section("Modo de Diagnóstico") {
-                    Picker("Exibição de Falhas", selection: $store.diagnosticViewMode) {
-                        ForEach(DiagnosticViewMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    Text(
-                        store.diagnosticViewMode == .customerSimple
-                        ? "Visão Cliente: Explicação em português leigo, traduzindo códigos para a rotina diária e orientando se é seguro dirigir ou como evitar ser enganado na oficina."
-                        : "Visão Mecânico: Códigos DTC brutos SAE/UDS, bytes de tipo de falha (FTB), freeze frames e registros hexadecimais para análise profissional."
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
-
-                // MARK: - Perfil Padrão de Combustível Flex
-                Section("Injeção & Combustível Flex") {
-                    Picker("Perfil de Combustível", selection: $store.selectedFuelProfile) {
-                        ForEach(FuelTypeProfile.allCases) { profile in
-                            Text(profile.rawValue).tag(profile)
-                        }
-                    }
-
-                    Text("Define a razão estequiométrica (AFR) e densidade do combustível para o cálculo de km/L em tempo real. No modo Automático, a sonda e ECU calibram a mistura sozinha.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    Stepper(
-                        value: Binding(
-                            get: { store.vehicleIdentity.displacementLiters },
-                            set: { store.setDisplacementLiters($0) }
-                        ),
-                        in: 0.6...8.0,
-                        step: 0.1
-                    ) {
-                        LabeledContent("Cilindrada do motor", value: String(format: "%.1f L", store.vehicleIdentity.displacementLiters))
-                    }
-
-                    Text("Usada só no cálculo de consumo quando o carro não tem sensor de fluxo de ar (MAF). Fica salva para cada carro, pelo chassi.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-
-                    if !store.tripHistory.isEmpty {
-                        Button(role: .destructive) {
-                            store.tripHistory.removeAll()
-                            UserDefaults.standard.removeObject(forKey: store.tripHistoryKey)
-                        } label: {
-                            Label("Limpar Histórico de Viagens Salvo", systemImage: "trash")
-                                .font(.caption)
-                        }
-                    }
-                }
-
                 // MARK: - Informações do App & Hardware
                 Section("Sobre o CarSensei") {
-                    LabeledContent("Versão", value: appVersion)
-                    LabeledContent("Veículo Detectado", value: store.vehicleIdentity.modelDescription)
-                    LabeledContent("Scanner Ativo", value: store.vehicleIdentity.adapterTier.rawValue)
-                    LabeledContent("Protocolo OBD", value: store.vehicleIdentity.obdProtocol)
-                    if !store.vehicleIdentity.vin.contains("Aguardando") {
-                        LabeledContent("VIN Registrado", value: store.vehicleIdentity.vin)
-                    }
+                    LabeledContent("Versão do Aplicativo", value: appVersion)
+                    LabeledContent("Scanner BLE Compatível", value: store.vehicleIdentity.adapterTier.rawValue)
+                    LabeledContent("Protocolo de Comunicação", value: store.vehicleIdentity.obdProtocol)
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Diretriz de Segurança Automotiva")
                             .font(.caption.bold())
-                        Text("O CarSensei opera estritamente dentro das normas ISO 15765-4 (CAN) e ISO 14229 (UDS). Limpezas de memória DTC são bloqueadas com motor ligado ou em movimento (segurança KOEO).")
+                        Text("O CarSensei opera estritamente dentro das normas ISO 15765-4 (CAN) e ISO 14229 (UDS). Limpezas de memória DTC são bloqueadas com motor ligado ou em movimento (segurança veicular KOEO).")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }

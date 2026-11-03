@@ -986,6 +986,7 @@ struct BLEScannerSheetView: View {
 struct ConnectedVehiclesHistorySheetView: View {
     @EnvironmentObject var store: CarSenseiStore
     @Environment(\.dismiss) private var dismiss
+    @State private var showConfirmClearAll = false
 
     var body: some View {
         NavigationStack {
@@ -1038,9 +1039,20 @@ struct ConnectedVehiclesHistorySheetView: View {
                             }
                             .padding(.vertical, 4)
                         }
+                        .onDelete { offsets in
+                            store.deleteConnectedVehicles(at: offsets)
+                        }
                     }
                 } header: {
-                    Text("Veículos Reconhecidos Automaticamente")
+                    HStack {
+                        Text("Veículos Reconhecidos (\(store.connectedVehiclesHistory.count))")
+                        Spacer()
+                        if !store.connectedVehiclesHistory.isEmpty {
+                            Text("Deslize para apagar")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 } footer: {
                     Text("O CarSensei detecta automaticamente o modelo, motor e câmbio pela leitura do chassi (VIN 22 F1 90 / 09 02) e da calibração da injeção ao conectar no carro.")
                 }
@@ -1048,9 +1060,32 @@ struct ConnectedVehiclesHistorySheetView: View {
             .navigationTitle("Histórico de Veículos")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !store.connectedVehiclesHistory.isEmpty {
+                        Button(role: .destructive) {
+                            showConfirmClearAll = true
+                        } label: {
+                            Text("Limpar Tudo")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Fechar") { dismiss() }
                 }
+            }
+            .confirmationDialog(
+                "Limpar Histórico de Veículos?",
+                isPresented: $showConfirmClearAll,
+                titleVisibility: .visible
+            ) {
+                Button("Limpar Todo o Histórico", role: .destructive) {
+                    store.clearConnectedVehiclesHistory()
+                }
+                Button("Cancelar", role: .cancel) {}
+            } message: {
+                Text("Esta ação remove todos os veículos salvos e registros de falhas antigas de outros veículos.")
             }
         }
     }

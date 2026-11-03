@@ -16,7 +16,6 @@ struct DiagnosticsView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
                         currentVehicleContextBadge
-                        viewModeSegmentedCard
                         scanActionsCard
 
                         if store.isScanningDTCs {
@@ -39,10 +38,7 @@ struct DiagnosticsView: View {
                                 .foregroundStyle(Tema.textoSuave)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             ForEach(store.archivedFaultsForCurrentVehicle) { fault in
-                                FaultInterpreterCard(
-                                    fault: fault,
-                                    viewMode: store.diagnosticViewMode
-                                ) {
+                                FaultInterpreterCard(fault: fault) {
                                     selectedFault = fault
                                 }
                                 .opacity(0.75)
@@ -53,10 +49,7 @@ struct DiagnosticsView: View {
                             emptyFaultsCard
                         } else {
                             ForEach(store.activeFaults) { fault in
-                                FaultInterpreterCard(
-                                    fault: fault,
-                                    viewMode: store.diagnosticViewMode
-                                ) {
+                                FaultInterpreterCard(fault: fault) {
                                     selectedFault = fault
                                 }
                             }
@@ -121,50 +114,11 @@ struct DiagnosticsView: View {
         .tissotScreen("Diagnóstico Inteligente")
     }
 
-    // MARK: - Customer Simple vs. Mechanic Technical Mode Selector
-    private var viewModeSegmentedCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("MODO DE EXPLICACÃO DO DIAGNÓSTICO", systemImage: "person.2.wave.2.fill")
-                    .font(.caption2.weight(.heavy))
-                    .foregroundStyle(Color.blue)
-                    .tracking(0.8)
-                Spacer()
-            }
-
-            Picker("Modo de Visão", selection: $store.diagnosticViewMode) {
-                ForEach(DiagnosticViewMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            Text(
-                store.diagnosticViewMode == .customerSimple
-                ? "Explicação clara para quem não é mecânico: entenda o que houve, se pode continuar dirigindo e evite cobranças indevidas na oficina."
-                : "Visão técnica de engenharia: códigos DTC + FTB hex, máscara de status ISO 14229, cabeçalhos CAN e Snapshot 19 04."
-            )
-            .font(.caption)
-            .foregroundStyle(Tema.textoSuave)
-        }
-        .padding(14)
-        .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.blue.opacity(0.20), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
-    }
-
     private var scanActionsCard: some View {
         let ready = store.connectionState == .connectedReady
         let koeo = store.koeoClearSafetyAssessment
         return VStack(alignment: .leading, spacing: 12) {
-            Text(
-                store.diagnosticViewMode == .customerSimple
-                ? "O CarSensei traduz códigos complexos do carro para uma linguagem simples e protege você contra orçamentos desnecessários na oficina."
-                : "Varredura UDS Serviço 19 02 FF + 19 04 Snapshot nos módulos ECM (7E0), TCU (7E1), HVAC (744), BDM (740), ABS (720) e ICM (710)."
-            )
+            Text("Varredura inteligente nos módulos de injeção, câmbio, ar-condicionado, carroceria e freios com tradução em linguagem simples e dados técnicos de engenharia.")
             .font(.caption)
             .foregroundStyle(Tema.textoSuave)
 
@@ -343,10 +297,7 @@ struct DiagnosticsView: View {
                     }
 
                     ForEach(otherFaults) { fault in
-                        FaultInterpreterCard(
-                            fault: fault,
-                            viewMode: store.diagnosticViewMode
-                        ) {
+                        FaultInterpreterCard(fault: fault) {
                             selectedFault = fault
                         }
                         .opacity(0.65)
@@ -372,12 +323,10 @@ struct DiagnosticsView: View {
     }
 }
 
-// MARK: - Dual-View Fault Card (Customer Simple vs. Mechanic Technical)
+// MARK: - Unified Fault Card (Leigo + Técnico Integrados no Mesmo Card)
 struct FaultInterpreterCard: View {
     let fault: DiagnosticFault
-    let viewMode: DiagnosticViewMode
     let onTap: () -> Void
-
 
     private var severityColor: Color {
         switch fault.interpretation.urgency {
@@ -391,18 +340,107 @@ struct FaultInterpreterCard: View {
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 12) {
-                if viewMode == .customerSimple {
-                    customerSimpleContent
-                } else {
-                    mechanicTechnicalContent
+                // 1. Cabeçalho Técnico: Módulo + Código DTC + Status + Máscara
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(fault.moduleCode) • \(fault.moduleName)".uppercased())
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(severityColor)
+                            .tracking(0.7)
+
+                        HStack(spacing: 8) {
+                            Text(fault.displayCode)
+                                .font(.system(.title3, design: .monospaced).weight(.black))
+                                .foregroundStyle(Tema.texto)
+
+                            Text(fault.statusSummaryPt)
+                                .font(.caption2.monospaced().weight(.bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(severityColor.opacity(0.14), in: Capsule())
+                                .foregroundStyle(severityColor)
+                        }
+                    }
+
+                    Spacer()
+
+                    if let mask = fault.statusMaskHex {
+                        Text("Mask 0x\(mask)")
+                            .font(.caption2.monospaced().weight(.bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Tema.subcartao, in: Capsule())
+                            .foregroundStyle(Tema.textoSuave)
+                    }
                 }
 
+                // 2. Título Amigável e Explicação em Linguagem Simples
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(fault.interpretation.headline)
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(Tema.texto)
+
+                    Text(fault.interpretation.resolvedCustomerStory)
+                        .font(.subheadline)
+                        .foregroundStyle(Tema.texto.opacity(0.88))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                // 3. Orientação de Segurança: Posso Continuar Dirigindo?
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "steeringwheel")
+                        .font(.headline)
+                        .foregroundStyle(severityColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("POSSO CONTINUAR DIRIGINDO?")
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(severityColor)
+                        Text(fault.interpretation.resolvedCustomerBanner)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Tema.texto)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(severityColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+
+                // 4. Orientação Técnica / Dica para Oficina
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "shield.lefthalf.filled.badge.checkmark")
+                        .font(.headline)
+                        .foregroundStyle(Color.green)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("PROTEÇÃO NA OFICINA (DICA DO SENSEI)")
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(Color.green)
+                        Text(fault.interpretation.resolvedWorkshopTip)
+                            .font(.caption)
+                            .foregroundStyle(Tema.texto)
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+
+                // 5. Ação Recomendada Técnica
+                HStack(spacing: 8) {
+                    Image(systemName: "wrench.and.screwdriver.fill")
+                        .font(.caption)
+                        .foregroundStyle(severityColor)
+                    Text("Ação recomendada: \(fault.interpretation.recommendedAction)")
+                        .font(.caption)
+                        .foregroundStyle(Tema.textoSuave)
+                        .lineLimit(2)
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Tema.subcartao, in: RoundedRectangle(cornerRadius: 10))
+
+                // 6. Rodapé do Card
                 HStack {
                     Spacer()
                     Label(
-                        viewMode == .customerSimple
-                        ? "Toque para ver orientação completa"
-                        : "Toque para inspecionar Snapshot UDS 19 04 e causas técnicas",
+                        "Toque para inspecionar Snapshot UDS 19 04 e causas",
                         systemImage: "chevron.right.circle.fill"
                     )
                     .font(.caption2.weight(.bold))
@@ -419,137 +457,13 @@ struct FaultInterpreterCard: View {
         }
         .buttonStyle(.plain)
     }
-
-    // MARK: Customer Simple Card Layout
-    private var customerSimpleContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(severityColor)
-                            .frame(width: 9, height: 9)
-                        Text(fault.isActiveNow ? "ATENÇÃO AGORA" : "MEMÓRIA PASSADA (HOJE NORMAL)")
-                            .font(.caption2.weight(.heavy))
-                            .foregroundStyle(severityColor)
-                    }
-
-                    Text(fault.interpretation.headline)
-                        .font(.title3.weight(.black))
-                        .foregroundStyle(Tema.texto)
-                }
-                Spacer()
-                Text(fault.displayCode)
-                    .font(.caption.monospaced().weight(.bold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Tema.subcartao, in: Capsule())
-                    .foregroundStyle(Tema.textoSuave)
-            }
-
-            Text(fault.interpretation.resolvedCustomerStory)
-                .font(.subheadline)
-                .foregroundStyle(Tema.texto.opacity(0.88))
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "steeringwheel")
-                    .font(.headline)
-                    .foregroundStyle(severityColor)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("POSSO CONTINUAR DIRIGINDO?")
-                        .font(.caption2.weight(.heavy))
-                        .foregroundStyle(severityColor)
-                    Text(fault.interpretation.resolvedCustomerBanner)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Tema.texto)
-                }
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(severityColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
-
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "shield.lefthalf.filled.badge.checkmark")
-                    .font(.headline)
-                    .foregroundStyle(Color.green)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("PROTEÇÃO NA OFICINA (DICA DO SENSEI)")
-                        .font(.caption2.weight(.heavy))
-                        .foregroundStyle(Color.green)
-                    Text(fault.interpretation.resolvedWorkshopTip)
-                        .font(.caption)
-                        .foregroundStyle(Tema.texto)
-                }
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
-        }
-    }
-
-    // MARK: Mechanic Technical Card Layout
-    private var mechanicTechnicalContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(fault.moduleCode) • \(fault.moduleName)".uppercased())
-                        .font(.caption2.weight(.heavy))
-                        .foregroundStyle(severityColor)
-                        .tracking(0.7)
-
-                    HStack(spacing: 8) {
-                        Text(fault.displayCode)
-                            .font(.system(.title3, design: .monospaced).weight(.black))
-                            .foregroundStyle(Tema.texto)
-
-                        Text(fault.statusSummaryPt)
-                            .font(.caption2.monospaced().weight(.bold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(severityColor.opacity(0.14), in: Capsule())
-                            .foregroundStyle(severityColor)
-                    }
-                }
-                Spacer()
-                if let mask = fault.statusMaskHex {
-                    Text("Mask 0x\(mask)")
-                        .font(.caption2.monospaced().weight(.bold))
-                        .foregroundStyle(Tema.textoSuave)
-                }
-            }
-
-            Text(fault.interpretation.headline)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(Tema.texto)
-
-            Text(fault.interpretation.plainExplanation)
-                .font(.caption)
-                .foregroundStyle(Tema.textoSuave)
-                .lineLimit(3)
-
-            HStack(spacing: 8) {
-                Image(systemName: "wrench.and.screwdriver.fill")
-                    .font(.caption)
-                    .foregroundStyle(severityColor)
-                Text(fault.interpretation.recommendedAction)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Tema.texto)
-                    .lineLimit(2)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Tema.subcartao, in: RoundedRectangle(cornerRadius: 12))
-        }
-    }
 }
 
-// MARK: - Detailed Fault Sheet (Dual-View Aware)
+// MARK: - Detailed Fault Sheet (Unificado)
 struct FaultDetailSheetView: View {
     let fault: DiagnosticFault
     @EnvironmentObject var store: CarSenseiStore
     @Environment(\.dismiss) private var dismiss
-
 
     private var liveFault: DiagnosticFault {
         store.activeFaults.first(where: { $0.id == fault.id }) ?? fault
@@ -562,18 +476,8 @@ struct FaultDetailSheetView: View {
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 16) {
-                        Picker("Modo de Visão", selection: $store.diagnosticViewMode) {
-                            ForEach(DiagnosticViewMode.allCases) { mode in
-                                Text(mode.rawValue).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-
-                        if store.diagnosticViewMode == .customerSimple {
-                            customerDetailSections
-                        } else {
-                            mechanicDetailSections
-                        }
+                        customerDetailSections
+                        mechanicDetailSections
                     }
                     .padding(16)
                 }

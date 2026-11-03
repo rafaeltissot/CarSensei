@@ -9,12 +9,9 @@ struct TripAnalysisView: View {
     @State private var shareFile: ShareFile?
     @State private var isBuildingPDF: Bool = false
 
-    private var activeReport: TripSensorAnalysisReport? {
-        if let id = selectedReportID,
-           let match = store.tripAnalysisReportsHistory.first(where: { $0.id == id }) {
-            return match
-        }
-        return store.latestTripAnalysisReport ?? store.tripAnalysisReportsHistory.first
+    private var activeSelectedReport: TripSensorAnalysisReport? {
+        guard let id = selectedReportID else { return nil }
+        return store.tripAnalysisReportsHistory.first(where: { $0.id == id })
     }
 
     private let categories: [String] = [
@@ -40,21 +37,18 @@ struct TripAnalysisView: View {
                             liveRecordingProgressSection
                         }
 
-                        if let report = activeReport {
-                            reportViewModeCard
-                            tripReportHeroCard(report)
-                            reportFilterBar(report)
-                            reportSensorCardsSection(report)
-                        } else if !store.isAnalyzingTripSensors {
-                            emptyReportPlaceholderCard
-                        }
-
-                        if store.tripAnalysisReportsHistory.count > 1 {
+                        // Histórico de viagens logo no topo
+                        if !store.tripAnalysisReportsHistory.isEmpty {
                             savedReportsHistorySection
                         }
 
-                        if !store.tripAnalysisReportsHistory.isEmpty || !store.tripHistory.isEmpty {
-                            tripReportExportCard
+                        // Detalhes da viagem aberta (apenas se selecionada pelo usuário)
+                        if let report = activeSelectedReport {
+                            tripReportHeroCard(report)
+                            reportFilterBar(report)
+                            reportSensorCardsSection(report)
+                        } else if store.tripAnalysisReportsHistory.isEmpty && !store.isAnalyzingTripSensors {
+                            emptyReportPlaceholderCard
                         }
                     }
                     .padding(.horizontal, 16)
@@ -106,32 +100,6 @@ struct TripAnalysisView: View {
                 }
 
                 Spacer()
-
-                Menu {
-                    Section("Combustível no Tanque") {
-                        ForEach(FuelTypeProfile.allCases) { fuel in
-                            Button {
-                                store.selectedFuelProfile = fuel
-                            } label: {
-                                HStack {
-                                    Text(fuel.rawValue)
-                                    if store.selectedFuelProfile == fuel {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "slider.horizontal.3")
-                        Text("Veículo")
-                    }
-                    .font(.caption.weight(.bold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Tema.subcartao, in: Capsule())
-                }
             }
 
             Text(store.activeVehicleDynamicParametersSummary)
@@ -282,7 +250,6 @@ struct TripAnalysisView: View {
                 ForEach(items) { item in
                     TripSensorReportCard(
                         item: item,
-                        viewMode: store.diagnosticViewMode,
                         isLiveRecording: true
                     )
                 }
@@ -290,30 +257,114 @@ struct TripAnalysisView: View {
         }
     }
 
-    // MARK: - 4. Seletor Visão para Leigos vs Visão Mecânico
+    // MARK: - 4. Histórico de Viagens Analisadas (Posicionado no topo, fechado por padrão)
 
-    private var reportViewModeCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var savedReportsHistorySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: store.diagnosticViewMode == .customerSimple ? "person.crop.circle.badge.checkmark" : "wrench.and.screwdriver.fill")
-                    .foregroundStyle(.blue)
-                Text("Modo de Explicação do Relatório")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Tema.textoSuave)
+                Label("Histórico de Viagens", systemImage: "clock.arrow.circlepath")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Tema.texto)
                 Spacer()
+                Text("\(store.tripAnalysisReportsHistory.count) viagem(ns)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Tema.textoSuave)
             }
 
-            Picker("Modo de Visão", selection: $store.diagnosticViewMode) {
-                Text("Para Leigos (Simples)").tag(DiagnosticViewMode.customerSimple)
-                Text("Técnico (Mecânico)").tag(DiagnosticViewMode.mechanicTechnical)
+            ForEach(store.tripAnalysisReportsHistory) { rep in
+                let isCurrent = (selectedReportID == rep.id)
+                let color = colorForHealth(rep.overallHealth)
+
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        // Toque no card para abrir ou fechar as informações da viagem
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                if selectedReportID == rep.id {
+                                    selectedReportID = nil
+                                } else {
+                                    selectedReportID = rep.id
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text("\(rep.overallScorePercent)%")
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .foregroundStyle(color)
+                                    .frame(width: 42, height: 42)
+                                    .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(rep.vehicleModel)
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(Tema.texto)
+                                        .lineLimit(1)
+                                    Text("\(rep.endDate.formatted(date: .abbreviated, time: .shortened)) • \(String(format: "%.1f km", rep.distanceKm))")
+                                        .font(.caption2)
+                                        .foregroundStyle(Tema.textoSuave)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: isCurrent ? "chevron.up.circle.fill" : "chevron.down.circle")
+                                    .font(.subheadline)
+                                    .foregroundStyle(isCurrent ? Color.blue : Color.secondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        // Botão de gerar PDF individual ao lado da viagem
+                        Button {
+                            gerarRelatorioPDF(para: rep)
+                        } label: {
+                            HStack(spacing: 4) {
+                                if isBuildingPDF {
+                                    ProgressView().controlSize(.mini)
+                                } else {
+                                    Image(systemName: "doc.text.fill")
+                                }
+                                Text("PDF")
+                            }
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(Color.indigo.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Color.indigo)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isBuildingPDF)
+                        .accessibilityLabel("Gerar PDF desta viagem para IA")
+
+                        // Botão de excluir viagem
+                        Button(role: .destructive) {
+                            withAnimation {
+                                if selectedReportID == rep.id {
+                                    selectedReportID = nil
+                                }
+                                store.deleteTripAnalysisReport(rep.id)
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundStyle(.red.opacity(0.8))
+                                .padding(6)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Excluir viagem")
+                    }
+                    .padding(12)
+                }
+                .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(isCurrent ? Color.blue.opacity(0.6) : Tema.borda, lineWidth: isCurrent ? 1.5 : 1)
+                )
             }
-            .pickerStyle(.segmented)
         }
-        .padding(12)
-        .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 14))
     }
 
-    // MARK: - 5. Resumo Geral do Laudo da Viagem
+    // MARK: - 5. Resumo Geral do Laudo da Viagem Aberta
 
     private func tripReportHeroCard(_ report: TripSensorAnalysisReport) -> some View {
         let accent = colorForHealth(report.overallHealth)
@@ -343,7 +394,7 @@ struct TripAnalysisView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text("LAUDO DOS SENSORES DA VIAGEM")
+                        Text("DETALHES DA VIAGEM SELECIONADA")
                             .font(.caption2.weight(.heavy))
                             .foregroundStyle(accent)
                         Spacer()
@@ -462,7 +513,7 @@ struct TripAnalysisView: View {
         }
     }
 
-    // MARK: - 7. Lista de Cards de Todos os Sensores Analisados no Relatório
+    // MARK: - 7. Lista de Cards de Todos os Sensores Analisados
 
     private func reportSensorCardsSection(_ report: TripSensorAnalysisReport) -> some View {
         let filtered = report.items.filter { item in
@@ -496,7 +547,6 @@ struct TripAnalysisView: View {
                 ForEach(filtered) { item in
                     TripSensorReportCard(
                         item: item,
-                        viewMode: store.diagnosticViewMode,
                         isLiveRecording: false
                     )
                 }
@@ -526,61 +576,12 @@ struct TripAnalysisView: View {
         .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 16))
     }
 
-    // MARK: - 8.1 Relatório em PDF para análise externa (IA ou mecânico)
-
-    private var tripReportExportCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(.indigo)
-                    .frame(width: 34, height: 34)
-                    .background(Color.indigo.opacity(0.14), in: RoundedRectangle(cornerRadius: 9))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Relatório em PDF para IA")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(Tema.texto)
-                    Text("Gera um PDF com veículo, laudos, sensores (mín/méd/máx), faixas de referência, consumo e bateria — pronto para colar no ChatGPT/Claude ou levar ao mecânico.")
-                        .font(.caption2)
-                        .foregroundStyle(Tema.textoSuave)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            Button {
-                gerarRelatorioPDF()
-            } label: {
-                HStack(spacing: 6) {
-                    if isBuildingPDF {
-                        ProgressView().tint(.white).controlSize(.small)
-                    } else {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    Text(isBuildingPDF ? "Gerando PDF..." : "Gerar PDF e compartilhar")
-                        .font(.subheadline.weight(.bold))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 46)
-                .background(Color.indigo, in: RoundedRectangle(cornerRadius: 12))
-                .foregroundStyle(.white)
-            }
-            .disabled(isBuildingPDF)
-
-            Text("Inclui \(store.tripAnalysisReportsHistory.count) laudo(s) de viagem e \(store.tripHistory.count) viagem(ns) de consumo.")
-                .font(.caption2)
-                .foregroundStyle(Tema.textoSuave)
-        }
-        .padding(14)
-        .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.indigo.opacity(0.28), lineWidth: 1))
-    }
+    // MARK: - Geração de PDF da Viagem para IA
 
     @MainActor
-    private func gerarRelatorioPDF() {
+    private func gerarRelatorioPDF(para report: TripSensorAnalysisReport) {
         isBuildingPDF = true
         let identity = store.vehicleIdentity
-        let reports = store.tripAnalysisReportsHistory
         let trips = store.tripHistory
         let battery = store.lastBatterySnapshot
         let adapter = "\(identity.adapterTier.rawValue) — \(identity.adapterFirmware)"
@@ -588,7 +589,7 @@ struct TripAnalysisView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let url = TripReportPDF.build(
                 identity: identity,
-                reports: reports,
+                reports: [report],
                 fuelTrips: trips,
                 adapterDescription: adapter,
                 batterySnapshot: battery
@@ -598,82 +599,12 @@ struct TripAnalysisView: View {
                 if let url {
                     shareFile = ShareFile(url: url)
                     TissotFeedback.log("TRIP_PDF_GENERATED", [
-                        "reports": reports.count,
-                        "trips": trips.count,
+                        "report_id": report.id.uuidString,
                         "bytes": (try? Data(contentsOf: url).count) ?? 0
                     ])
                 } else {
                     TissotFeedback.log("TRIP_PDF_FAILED", [:], level: .error)
                 }
-            }
-        }
-    }
-
-    // MARK: - 9. Histórico de Viagens Analisadas
-
-    private var savedReportsHistorySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Histórico de Laudos de Viagem", systemImage: "clock.arrow.circlepath")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Tema.texto)
-                Spacer()
-                Text("\(store.tripAnalysisReportsHistory.count) salvos")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Tema.textoSuave)
-            }
-
-            ForEach(store.tripAnalysisReportsHistory) { rep in
-                let isCurrent = (activeReport?.id == rep.id)
-                let color = colorForHealth(rep.overallHealth)
-
-                Button {
-                    selectedReportID = rep.id
-                } label: {
-                    HStack(spacing: 12) {
-                        Text("\(rep.overallScorePercent)%")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(color)
-                            .frame(width: 44, height: 44)
-                            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(rep.vehicleModel)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Tema.texto)
-                            Text("\(rep.endDate.formatted(date: .abbreviated, time: .shortened)) • \(String(format: "%.1f km", rep.distanceKm)) • \(rep.items.count) sensores")
-                                .font(.caption2)
-                                .foregroundStyle(Tema.textoSuave)
-                        }
-
-                        Spacer()
-
-                        if isCurrent {
-                            Text("Aberto")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.blue)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.12), in: Capsule())
-                        }
-
-                        Button(role: .destructive) {
-                            store.deleteTripAnalysisReport(rep.id)
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.caption)
-                                .foregroundStyle(.red.opacity(0.8))
-                                .padding(6)
-                        }
-                    }
-                    .padding(12)
-                    .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(isCurrent ? Color.blue.opacity(0.5) : Tema.borda, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -696,11 +627,10 @@ struct TripAnalysisView: View {
     }
 }
 
-// MARK: - Card Individual de Diagnóstico do Sensor na Viagem (Leigo & Técnico)
+// MARK: - Card Individual de Diagnóstico do Sensor na Viagem (Unificado: Leigo & Técnico Juntos)
 
 struct TripSensorReportCard: View {
     let item: TripSensorEvaluationItem
-    let viewMode: DiagnosticViewMode
     let isLiveRecording: Bool
 
     private var statusColor: Color {
@@ -766,58 +696,54 @@ struct TripSensorReportCard: View {
                 metricBox(title: "PARÂMETRO DO CARRO", value: item.expectedRangeText, highlight: .blue)
             }
 
-            // Explicação para Leigos vs Visão Técnica
-            if viewMode == .customerSimple {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "lightbulb.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.yellow)
-                            .padding(.top, 2)
-                        Text("**O que é:** \(item.laypersonWhatItIs)")
-                            .font(.caption)
-                            .foregroundStyle(Tema.textoSuave)
-                    }
-
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "chart.xyaxis.line")
-                            .font(.caption2)
-                            .foregroundStyle(statusColor)
-                            .padding(.top, 2)
-                        Text("**Na sua viagem:** \(item.laypersonTripVerdict)")
-                            .font(.caption)
-                            .foregroundStyle(Tema.texto)
-                    }
-
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: item.healthLevel == .healthy ? "hand.thumbsup.fill" : "wrench.and.screwdriver.fill")
-                            .font(.caption2)
-                            .foregroundStyle(statusColor)
-                            .padding(.top, 2)
-                        Text("**Conclusão:** \(item.laypersonPracticalAdvice)")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(item.healthLevel == .healthy ? Tema.textoSuave : statusColor)
-                    }
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Tema.subcartao, in: RoundedRectangle(cornerRadius: 10))
-            } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(item.technicalSummary)
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.blue)
-                    Text(item.laypersonTripVerdict)
-                        .font(.caption)
-                        .foregroundStyle(Tema.texto)
-                    Text(item.laypersonPracticalAdvice)
+            // Explicação Unificada (Linguagem Simples + Referência Técnica juntas)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.yellow)
+                        .padding(.top, 2)
+                    Text("**O que é:** \(item.laypersonWhatItIs)")
                         .font(.caption)
                         .foregroundStyle(Tema.textoSuave)
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Tema.subcartao, in: RoundedRectangle(cornerRadius: 10))
+
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "chart.xyaxis.line")
+                        .font(.caption2)
+                        .foregroundStyle(statusColor)
+                        .padding(.top, 2)
+                    Text("**Na sua viagem:** \(item.laypersonTripVerdict)")
+                        .font(.caption)
+                        .foregroundStyle(Tema.texto)
+                }
+
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: item.healthLevel == .healthy ? "hand.thumbsup.fill" : "wrench.and.screwdriver.fill")
+                        .font(.caption2)
+                        .foregroundStyle(statusColor)
+                        .padding(.top, 2)
+                    Text("**Conclusão:** \(item.laypersonPracticalAdvice)")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(item.healthLevel == .healthy ? Tema.textoSuave : statusColor)
+                }
+
+                Divider()
+                    .padding(.vertical, 2)
+
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "cpu.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                        .padding(.top, 2)
+                    Text(item.technicalSummary)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.blue)
+                }
             }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Tema.subcartao, in: RoundedRectangle(cornerRadius: 10))
         }
         .padding(14)
         .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 16))
