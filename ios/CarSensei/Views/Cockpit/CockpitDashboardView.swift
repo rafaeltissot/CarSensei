@@ -8,6 +8,7 @@ struct CockpitDashboardView: View {
     @State private var showMultimediaMirror = false
     @State private var showFeedbackSheet = false
     @State private var showVehicleHistorySheet = false
+    @State var showFuelFillUpSheet = false
 
     @AppStorage("cockpit.card.vehicle.expanded.v2") var isVehicleCardExpanded = false
     @AppStorage("cockpit.card.battery.expanded.v2") var isBatteryCardExpanded = false
@@ -120,6 +121,10 @@ struct CockpitDashboardView: View {
             }
             .sheet(isPresented: $showFeedbackSheet) {
                 TissotFeedbackSheet()
+            }
+            .sheet(isPresented: $showFuelFillUpSheet) {
+                FuelFillUpSheet()
+                    .environmentObject(store)
             }
             .sheet(isPresented: $showVehicleHistorySheet) {
                 ConnectedVehiclesHistorySheetView()

@@ -1067,6 +1067,31 @@ public struct TripRecord: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+/// Abastecimento registrado pelo usuário: base da média real (tanque a tanque) e do fator de calibração
+/// aplicado sobre a estimativa do OBD.
+public struct FuelFillUp: Codable, Equatable, Sendable {
+    public var recordedAt: Date
+    public var odometerKm: Double
+    public var liters: Double
+    /// Média real entre o abastecimento anterior e este, quando havia anterior.
+    public var realKmPerLiter: Double?
+
+    public init(recordedAt: Date = Date(), odometerKm: Double, liters: Double, realKmPerLiter: Double? = nil) {
+        self.recordedAt = recordedAt
+        self.odometerKm = odometerKm
+        self.liters = liters
+        self.realKmPerLiter = realKmPerLiter
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        recordedAt = c.valor(.recordedAt, Date())
+        odometerKm = c.valor(.odometerKm, 0)
+        liters = c.valor(.liters, 0)
+        realKmPerLiter = c.valorOpcional(.realKmPerLiter)
+    }
+}
+
 public struct BatteryTripSnapshot: Codable, Equatable, Sendable {
     public let recordedAt: Date
     public let initialRestVoltage: Double
@@ -1124,6 +1149,9 @@ public struct TelemetrySnapshot: Codable, Equatable, Sendable {
     public var ambientTempC: Double?              // PID 01 46 / HVAC UDS
     public var fuelRateLitersPerHour: Double?     // Real-time fuel flow (L/h)
     public var instantKmPerLiter: Double?         // Real-time efficiency (km/L)
+    /// `true` quando o motor está em corte de injeção (pé fora do acelerador em movimento):
+    /// o consumo real é zero e o km/L não tem valor numérico honesto para mostrar.
+    public var isFuelCut: Bool = false
     public var timingAdvanceDeg: Double?          // PID 01 0E
     public var barometricPressureKpa: Double?     // PID 01 33
     public var fuelTankLevelPct: Double?          // PID 01 2F

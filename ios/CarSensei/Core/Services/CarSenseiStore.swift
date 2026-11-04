@@ -27,6 +27,15 @@ public final class CarSenseiStore: ObservableObject {
         }
     }
     @Published public var tripHistory: [TripRecord] = []
+    /// Fator aprendido nos abastecimentos: corrige a estimativa do OBD para bater com o tanque a tanque.
+    @Published public var fuelCalibrationFactor: Double = 1.0 {
+        didSet { UserDefaults.standard.set(fuelCalibrationFactor, forKey: fuelCalibrationKey) }
+    }
+    /// Último abastecimento registrado (base da média real).
+    @Published public var lastFillUp: FuelFillUp?
+    /// Litros e km acumulados desde o último abastecimento — é o que calibra a estimativa do OBD.
+    @Published public var litersSinceFillUp: Double = 0
+    @Published public var kmSinceFillUp: Double = 0
     @Published public var lastBatterySnapshot: BatteryTripSnapshot?
 
     // Guardião Térmico (CVT e arrefecimento)
@@ -86,6 +95,12 @@ public final class CarSenseiStore: ObservableObject {
     let odometerReportKey = "carsensei.odometer.report.v2"
     let clusterKmSavedKey = "carsensei.cluster.km.v1"
     let tripHistoryKey = "carsensei.trip.history.v1"
+    private let fuelCalibrationKey = "carsensei.fuel.calibration.v1"
+    private let lastFillUpKey = "carsensei.fuel.lastfill.v1"
+    private let sessionDistanceKey = "carsensei.session.distance.v1"
+    private let sessionFuelKey = "carsensei.session.fuel.v1"
+    private let litersSinceFillKey = "carsensei.fuel.sincefill.l.v1"
+    private let kmSinceFillKey = "carsensei.fuel.sincefill.km.v1"
     let batterySnapshotKey = "carsensei.battery.snapshot.v1"
     private let enabledGaugesKey = "carsensei.enabled.gauges.v1"
     private let carPlaySlotsKey = "carsensei.carplay.slots.v1"
@@ -305,10 +320,57 @@ public final class CarSenseiStore: ObservableObject {
         saveCarPlaySlotPreferences()
     }
 
+    /// Registra um abastecimento real e recalibra a estimativa do OBD.
+    /// O fator é a razão entre o que a bomba entregou e o que o app estimou gastar no mesmo trecho.
+    public func registerFillUp(odometerKm: Double, liters: Double) {
+        guard odometerKm > 0, liters > 5 else { return }
+
+        let estimado = litersSinceFillUp
+        let kmTrecho = kmSinceFillUp
+        var realKmL: Double?
+
+        if kmTrecho > 5, liters > 5 {
+            realKmL = kmTrecho / liters
+            if estimado > 2 {
+                let ajuste = liters / estimado
+                fuelCalibrationFactor = min(max(fuelCalibrationFactor * ajuste, 0.6), 1.6)
+            }
+        }
+
+        lastFillUp = FuelFillUp(odometerKm: odometerKm, liters: liters, realKmPerLiter: realKmL)
+        if let data = try? JSONEncoder().encode(lastFillUp) {
+            UserDefaults.standard.set(data, forKey: lastFillUpKey)
+        }
+
+        TissotFeedback.log("FUEL_FILLUP", [
+            "odometer": String(format: "%.0f", odometerKm),
+            "liters": String(format: "%.2f", liters),
+            "estimado_l": String(format: "%.2f", estimado),
+            "km_trecho": String(format: "%.1f", kmTrecho),
+            "real_kml": realKmL.map { String(format: "%.2f", $0) } ?? "nil",
+            "factor": String(format: "%.3f", fuelCalibrationFactor)
+        ])
+
+        litersSinceFillUp = 0
+        kmSinceFillUp = 0
+        saveFuelSession()
+    }
+
+    /// Persiste os contadores que precisam sobreviver a reinício do app (média da viagem e do trecho).
+    func saveFuelSession() {
+        let d = UserDefaults.standard
+        d.set(liveTelemetry.sessionDistanceKm, forKey: sessionDistanceKey)
+        d.set(liveTelemetry.sessionFuelLiters, forKey: sessionFuelKey)
+        d.set(litersSinceFillUp, forKey: litersSinceFillKey)
+        d.set(kmSinceFillUp, forKey: kmSinceFillKey)
+    }
+
     public func resetTripFuelCounters() {
         recordCurrentTripToHistory()
         liveTelemetry.sessionDistanceKm = 0.0
         liveTelemetry.sessionFuelLiters = 0.0
+        UserDefaults.standard.set(0.0, forKey: sessionDistanceKey)
+        UserDefaults.standard.set(0.0, forKey: sessionFuelKey)
     }
 
     public func recordCurrentTripToHistory() {
@@ -710,8 +772,13 @@ public final class CarSenseiStore: ObservableObject {
                         in: &self.liveTelemetry,
                         fuelProfile: self.selectedFuelProfile,
                         displacementLiters: self.vehicleIdentity.displacementLiters,
-                        elapsedSeconds: dt
+                        elapsedSeconds: dt,
+                        calibrationFactor: self.fuelCalibrationFactor
                     )
+                    let hours = dt / 3600.0
+                    self.litersSinceFillUp += (self.liveTelemetry.fuelRateLitersPerHour ?? 0) * hours
+                    self.kmSinceFillUp += (self.liveTelemetry.speedKmh ?? 0) * hours
+                    if cycleCounter % 15 == 0 { self.saveFuelSession() }
 
                     // Viagem: começa no primeiro movimento e guarda as temperaturas máximas
                     if self.tripStartDate == nil, (self.liveTelemetry.speedKmh ?? 0) > 0 {
@@ -890,6 +957,16 @@ public final class CarSenseiStore: ObservableObject {
 
         if let savedKm = UserDefaults.standard.string(forKey: clusterKmSavedKey) {
             clusterKmInputText = savedKm
+        }
+
+        fuelCalibrationFactor = UserDefaults.standard.object(forKey: fuelCalibrationKey) as? Double ?? 1.0
+        litersSinceFillUp = UserDefaults.standard.double(forKey: litersSinceFillKey)
+        kmSinceFillUp = UserDefaults.standard.double(forKey: kmSinceFillKey)
+        liveTelemetry.sessionDistanceKm = UserDefaults.standard.double(forKey: sessionDistanceKey)
+        liveTelemetry.sessionFuelLiters = UserDefaults.standard.double(forKey: sessionFuelKey)
+        if let fillData = UserDefaults.standard.data(forKey: lastFillUpKey),
+           let decodedFill = try? JSONDecoder().decode(FuelFillUp.self, from: fillData) {
+            lastFillUp = decodedFill
         }
 
         if let savedTrips = UserDefaults.standard.data(forKey: tripHistoryKey),

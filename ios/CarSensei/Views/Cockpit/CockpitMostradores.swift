@@ -255,6 +255,9 @@ extension CockpitDashboardView {
         let isMoving = (t.speedKmh ?? 0) >= 3.0
         let primaryMetricTitle = isMoving ? "Consumo Instantâneo" : "Fluxo em Marcha Lenta"
         let primaryMetricValue: String = {
+            if t.isFuelCut {
+                return "Corte (0 L/h)"
+            }
             if isMoving, let kml = t.instantKmPerLiter {
                 return String(format: "%.1f km/L", kml)
             } else if let lph = t.fuelRateLitersPerHour {
@@ -418,6 +421,36 @@ extension CockpitDashboardView {
                 }
                 .padding(10)
                 .background(Tema.fundo, in: RoundedRectangle(cornerRadius: 12))
+
+                // Calibração com abastecimento real: é o que aproxima a média do app da conta do posto.
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("MÉDIA REAL (TANQUE A TANQUE)")
+                            .font(.system(size: 9, weight: .heavy))
+                            .foregroundStyle(Tema.textoSuave)
+                        Text(realAverageLabel)
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(store.lastFillUp?.realKmPerLiter == nil ? Tema.textoSuave : Color.teal)
+                            .monospacedDigit()
+                        Text(String(format: "Estimativa corrigida por fator %.2f · %.1f L desde o último abastecimento", store.fuelCalibrationFactor, store.litersSinceFillUp))
+                            .font(.system(size: 9))
+                            .foregroundStyle(Tema.textoSuave)
+                    }
+                    Spacer()
+                    Button {
+                        showFuelFillUpSheet = true
+                    } label: {
+                        Text("Abasteci")
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 44)
+                            .background(Color.teal.opacity(0.14), in: Capsule())
+                            .foregroundStyle(.teal)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(10)
+                .background(Tema.fundo, in: RoundedRectangle(cornerRadius: 12))
             }
         }
         .padding(16)
@@ -427,6 +460,13 @@ extension CockpitDashboardView {
                 .stroke(Color.green.opacity(0.28), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 2)
+    }
+
+    private var realAverageLabel: String {
+        if let real = store.lastFillUp?.realKmPerLiter {
+            return String(format: "%.1f km/L", real)
+        }
+        return "Toque em \"Abasteci\" para calibrar"
     }
 
     func economyMetricBox(title: String, value: String, subtitle: String, tint: Color) -> some View {

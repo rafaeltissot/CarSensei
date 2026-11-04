@@ -347,11 +347,13 @@ public enum OBDUDSParser {
         in snapshot: inout TelemetrySnapshot,
         fuelProfile: FuelTypeProfile,
         displacementLiters: Double = 1.498,
-        elapsedSeconds: Double
+        elapsedSeconds: Double,
+        calibrationFactor: Double = 1.0
     ) {
         guard let rpm = snapshot.rpm, rpm > 250 else {
             snapshot.fuelRateLitersPerHour = 0.0
             snapshot.instantKmPerLiter = nil
+            snapshot.isFuelCut = false
             return
         }
 
@@ -380,14 +382,30 @@ public enum OBDUDSParser {
         let density = fuelProfile.densityGramsPerLiter(detectedEthanolPct: snapshot.ethanolFuelPct)
 
         let gramsFuelPerSec = (airFlowGramsPerSec / afr) * trimMultiplier
-        let litersPerHour = (gramsFuelPerSec * 3600.0) / density
-        snapshot.fuelRateLitersPerHour = max(0.0, litersPerHour)
+        let brutoLitersPerHour = (gramsFuelPerSec * 3600.0) / density
+        // Fator aprendido com os abastecimentos reais do usuário (1.0 = sem calibração).
+        let fator = min(max(calibrationFactor, 0.6), 1.6)
+        var litersPerHour = max(0.0, brutoLitersPerHour * fator)
 
         let speed = snapshot.speedKmh ?? 0.0
-        if speed > 2.0 && litersPerHour > 0.1 {
-            snapshot.instantKmPerLiter = min(50.0, speed / litersPerHour)
-        } else {
+        let throttle = snapshot.throttlePositionPct ?? 100.0
+
+        // Corte de injeção: pé fora do acelerador, motor acima da marcha lenta e carro andando.
+        // Nessa condição a ECU zera o combustível; a vazão calculada por MAP/MAF não vale.
+        let fuelCut = speed > 15.0 && rpm > 1300.0 && throttle < 3.0
+        snapshot.isFuelCut = fuelCut
+        if fuelCut {
+            litersPerHour = 0.0
+            snapshot.fuelRateLitersPerHour = 0.0
             snapshot.instantKmPerLiter = nil
+        } else {
+            snapshot.fuelRateLitersPerHour = litersPerHour
+            // Sem teto artificial de 50 km/L: o painel do carro chega a ~90 em descida.
+            if speed > 2.0 && litersPerHour > 0.02 {
+                snapshot.instantKmPerLiter = min(99.9, speed / litersPerHour)
+            } else {
+                snapshot.instantKmPerLiter = nil
+            }
         }
 
         if elapsedSeconds > 0 && elapsedSeconds < 10.0 {

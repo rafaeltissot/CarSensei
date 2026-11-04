@@ -452,16 +452,36 @@ extension CarSenseiStore {
             )
 
         case .catalystTempB1S1:
+            // Catalisador trabalha entre ~400 °C e ~900 °C quando quente: isso é normal, não alerta.
+            // Faixas: <300 aquecendo · 300–850 normal · 850–920 alta · >920 proteção.
             let val = t.catalystTempB1S1C.map { String(format: "%.0f", $0) } ?? "--"
-            let over = (t.catalystTempB1S1C ?? 0) >= 920.0
+            let cat = t.catalystTempB1S1C ?? 0
+            let sub: String
+            let tint: Color
+            if t.catalystTempB1S1C == nil {
+                sub = "B1S1 (01 3C)"
+                tint = Color.secondary
+            } else if cat >= 920 {
+                sub = "ACIMA DA FAIXA (≥920°C)"
+                tint = .red
+            } else if cat >= 850 {
+                sub = "Alta (850–920°C)"
+                tint = .orange
+            } else if cat >= 300 {
+                sub = "Normal (400–800°C)"
+                tint = .teal
+            } else {
+                sub = "Aquecendo (<300°C)"
+                tint = Color.secondary
+            }
             return GaugeMetricPresentation(
                 value: val,
                 unit: "°C",
                 compactText: "\(val)°C",
-                subtitle: "B1S1 (01 3C)",
-                tint: over ? .red : .orange,
-                progress: (t.catalystTempB1S1C ?? 300.0) / 950.0,
-                isAlerting: over
+                subtitle: sub,
+                tint: tint,
+                progress: min(max(cat / 950.0, 0.0), 1.0),
+                isAlerting: cat >= 920
             )
 
         case .engineOilTemp:
@@ -1091,6 +1111,78 @@ struct ConnectedVehiclesHistorySheetView: View {
                 Button("Cancelar", role: .cancel) {}
             } message: {
                 Text("Esta ação remove todos os veículos salvos e registros de falhas antigas de outros veículos.")
+            }
+        }
+    }
+}
+
+
+// MARK: - Registro de Abastecimento (calibra a média do OBD com a bomba)
+
+struct FuelFillUpSheet: View {
+    @EnvironmentObject var store: CarSenseiStore
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var odometro: String = ""
+    @State private var litros: String = ""
+    @State private var erro: String?
+
+    private var odometroKm: Double? {
+        Double(odometro.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: "."))
+    }
+    private var litrosL: Double? {
+        Double(litros.replacingOccurrences(of: ",", with: "."))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Odômetro do painel (km)", text: $odometro)
+                        .keyboardType(.numberPad)
+                    TextField("Litros abastecidos", text: $litros)
+                        .keyboardType(.decimalPad)
+                } header: {
+                    Text("Abastecimento")
+                } footer: {
+                    Text("Serve para duas coisas: calcular a média real entre tanques e corrigir a estimativa do app (fator atual \(String(format: "%.2f", store.fuelCalibrationFactor))). Registre sempre com o tanque cheio para o cálculo valer.")
+                }
+
+                if let real = store.lastFillUp?.realKmPerLiter {
+                    Section("Último abastecimento") {
+                        LabeledContent("Média real", value: String(format: "%.1f km/L", real))
+                        LabeledContent("Fator aplicado", value: String(format: "%.2f", store.fuelCalibrationFactor))
+                    }
+                }
+
+                Section {
+                    LabeledContent("Estimado pelo app", value: String(format: "%.1f km", store.kmSinceFillUp))
+                    LabeledContent("Combustível estimado", value: String(format: "%.2f L", store.litersSinceFillUp))
+                } footer: {
+                    Text("Trecho acumulado desde o último abastecimento registrado.")
+                }
+
+                if let erro {
+                    Section { Text(erro).font(.caption).foregroundStyle(.red) }
+                }
+            }
+            .navigationTitle("Registrar Abastecimento")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Salvar") {
+                        guard let km = odometroKm, let l = litrosL, km > 0, l > 5 else {
+                            erro = "Informe o odômetro e os litros (mais de 5 L)."
+                            return
+                        }
+                        store.registerFillUp(odometerKm: km, liters: l)
+                        dismiss()
+                    }
+                    .disabled(odometroKm == nil || litrosL == nil)
+                }
             }
         }
     }
