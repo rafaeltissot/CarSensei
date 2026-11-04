@@ -397,13 +397,15 @@ public enum OBDUDSParser {
         if fuelCut {
             litersPerHour = 0.0
             snapshot.fuelRateLitersPerHour = 0.0
-            snapshot.instantKmPerLiter = nil
+            // No painel de bordo do veículo, em cut-off o consumo instantâneo bate no topo (99.9 km/L)
+            snapshot.instantKmPerLiter = 99.9
         } else {
             snapshot.fuelRateLitersPerHour = litersPerHour
-            // Sem teto artificial de 50 km/L: o painel do carro chega a ~90 em descida.
+            // Em movimento com injeção ativa
             if speed > 2.0 && litersPerHour > 0.02 {
                 snapshot.instantKmPerLiter = min(99.9, speed / litersPerHour)
             } else {
+                // Parado (velocidade <= 2 km/h): não existe km/L, o mostrador exibe fluxo em marcha lenta (L/h)
                 snapshot.instantKmPerLiter = nil
             }
         }

@@ -338,7 +338,7 @@ extension CarSenseiStore {
                 level = .critical
                 badge = "Crítico (Risco P0218)"
                 verdict = String(format: "O óleo do câmbio chegou a %.0f°C (limite crítico: %.0f°C)!", maxV, critMax)
-                advice = "Reduza o ritmo em serras/subidas e agende a verificação do fluido CVT e do trocador de calor do câmbio."
+                advice = "Reduza o ritmo em serras/subidas e agende a verificação do fluido (ATF/CVT) e do trocador de calor do câmbio."
             } else if maxV >= warnMax {
                 level = .attention
                 badge = "Atenção Térmica"

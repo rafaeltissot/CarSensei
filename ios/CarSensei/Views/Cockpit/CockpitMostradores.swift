@@ -255,13 +255,14 @@ extension CockpitDashboardView {
         let isMoving = (t.speedKmh ?? 0) >= 3.0
         let primaryMetricTitle = isMoving ? "Consumo Instantâneo" : "Fluxo em Marcha Lenta"
         let primaryMetricValue: String = {
-            if t.isFuelCut {
-                return "Corte (0 L/h)"
+            if t.isFuelCut && isMoving {
+                return "99.9 km/L (Cut-Off)"
             }
             if isMoving, let kml = t.instantKmPerLiter {
                 return String(format: "%.1f km/L", kml)
             } else if let lph = t.fuelRateLitersPerHour {
-                return String(format: "%.2f L/h", lph)
+                let mlMin = lph * 1000.0 / 60.0
+                return String(format: "%.2f L/h (%.0f ml/min)", lph, mlMin)
             }
             return "--"
         }()

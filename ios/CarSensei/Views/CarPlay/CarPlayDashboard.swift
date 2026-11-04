@@ -450,7 +450,7 @@ struct MultimediaMirrorDashboardView: View {
             return "Aguardando motor"
         }()
         let avgValueText = t.sessionAverageKmPerLiter.map { String(format: "%.1f", $0) } ?? "--"
-        let barProgress = min(max((t.instantKmPerLiter ?? 0) / 18.0, 0.04), 1.0)
+        let barProgress = min(max((t.instantKmPerLiter ?? 0) / 30.0, 0.04), 1.0)
 
         return VStack(alignment: .leading, spacing: 5) {
             // Dois Mostradores Lado a Lado no Topo: INSTANTÂNEO vs. MÉDIA DA VIAGEM

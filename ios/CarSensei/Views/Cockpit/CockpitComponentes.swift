@@ -20,18 +20,29 @@ extension CarSenseiStore {
         switch gauge {
         case .instantFuel:
             let moving = (t.speedKmh ?? 0) >= 3.0
-            let val = moving
-                ? (t.instantKmPerLiter.map { String(format: "%.1f", $0) } ?? "--")
-                : (t.fuelRateLitersPerHour.map { String(format: "%.2f", $0) } ?? "--")
+            let isCutOff = t.isFuelCut && moving
+            let val: String = {
+                if isCutOff { return "99.9" }
+                if moving {
+                    return t.instantKmPerLiter.map { String(format: "%.1f", $0) } ?? "--"
+                }
+                return t.fuelRateLitersPerHour.map { String(format: "%.2f", $0) } ?? "--"
+            }()
             let unit = moving ? "km/L" : "L/h"
+            let sub: String = {
+                if isCutOff { return "Cut-Off (Freio-motor)" }
+                if moving { return "Instantâneo" }
+                let mlMin = (t.fuelRateLitersPerHour ?? 0) * 1000.0 / 60.0
+                return String(format: "Marcha lenta (%.0f ml/min)", mlMin)
+            }()
             let prog = moving
-                ? min((t.instantKmPerLiter ?? 0) / 18.0, 1.0)
+                ? min(max((t.instantKmPerLiter ?? 0) / 30.0, 0.05), 1.0)
                 : min((t.fuelRateLitersPerHour ?? 0) / 4.0, 1.0)
             return GaugeMetricPresentation(
                 value: val,
                 unit: unit,
                 compactText: "\(val) \(unit)",
-                subtitle: moving ? "Instantâneo" : "Marcha lenta",
+                subtitle: sub,
                 tint: .green,
                 progress: prog,
                 isAlerting: false
@@ -471,11 +482,11 @@ extension CarSenseiStore {
             } else if cat >= 850 {
                 sub = "Alta (850–920°C)"
                 tint = .orange
-            } else if cat >= 300 {
-                sub = "Normal (400–800°C)"
+            } else if cat >= 350 {
+                sub = "Ideal (400–800°C)"
                 tint = .teal
             } else {
-                sub = "Aquecendo (<300°C)"
+                sub = "Aquecendo (<350°C)"
                 tint = Color.secondary
             }
             return GaugeMetricPresentation(

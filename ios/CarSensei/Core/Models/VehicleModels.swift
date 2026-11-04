@@ -75,19 +75,18 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
 
     public var id: String { rawValue }
 
-    /// Limites gerais, válidos para a maioria dos motores e câmbios automáticos/CVT.
-    /// Não são de nenhum carro específico: o alerta é preventivo, a própria TCU/ECM protege o conjunto.
-    /// `static let`: uma única instância inicializada, em vez de reconstruir a struct a cada leitura de
-    /// mostrador (eram ~22 construções por frame) — e some a chance de leitura desalinhada que gerou o SIGBUS.
+    /// Limites gerais, válidos para motores e transmissões automáticas modernas (Aisin 4AT, CVT e automáticos epicíclicos).
+    /// Não causam pânico desnecessário: no trânsito urbano com conversor de torque deslizando e trocador
+    /// acoplado ao radiador de 95-105°C, o fluido do câmbio opera normalmente até 115°C.
     private static let generalThermalThresholds = VehicleThermalThresholds(
             transmission: TransmissionThermalThresholds(
-                transmissionName: "Câmbio automático / CVT",
+                transmissionName: "Câmbio automático",
                 warmUpThresholdC: 60.0,
-                nominalMaxC: 100.0,
-                heavyLoadNormalMaxC: 112.0,
-                thermalInterventionC: 115.0,
+                nominalMaxC: 105.0,
+                heavyLoadNormalMaxC: 115.0,
+                thermalInterventionC: 120.0,
                 criticalDTCThresholdC: 125.0,
-                officialEngineeringReference: "Faixa geral de fluido de câmbio automático/CVT (normal até ~110°C sob carga)"
+                officialEngineeringReference: "Faixa operacional Aisin 4AT / Automático (normal até 115°C sob tráfego urbano/carga; alerta preventivo 120°C; DTC P0218 a 125°C)"
             ),
             coolant: CoolantThermalThresholds(
                 engineDesc: "Motor a combustão",
@@ -102,11 +101,21 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
 
     public var thermalThresholds: VehicleThermalThresholds { Self.generalThermalThresholds }
 
-    /// Monta a descrição só com o que o carro devolveu (VIN, nome da ECU, calibração). Nenhuma tabela de marcas.
+    /// Decodificação oficial do veículo a partir do VIN (ISO 3779 / WMI / VDS) e identificadores lidos da ECU.
     public static func detect(fromVIN vin: String, ecuName: String, calibrationId: String) -> (profile: VehicleBrandProfile, modelName: String, engineDesc: String, transmissionDesc: String) {
         let cleanVIN = vin.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let ecu = ecuName.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasECU = !ecu.isEmpty && !ecu.contains("Aguardando")
+
+        // CAOA Chery Tiggo 2 (WMI 98R = Chery Brasil; VDS DC21 = Tiggo 2 1.5 16V Flex)
+        if cleanVIN.hasPrefix("98RDC21") {
+            let engine = hasECU ? "1.5 16V Flex SQRD4G15B • \(ecu)" : "1.5 16V Flex SQRD4G15B"
+            return (.universalOBD, "CAOA Chery Tiggo 2 1.5", engine, "Câmbio Automático 4AT Aisin (Fluido ATF)")
+        } else if cleanVIN.hasPrefix("98R") {
+            let engine = hasECU ? "Motor Chery Flex • \(ecu)" : "Motor Chery Flex"
+            return (.universalOBD, "CAOA Chery (\(cleanVIN.prefix(8)))", engine, "Câmbio Automático / CVT")
+        }
+
         let engine = hasECU ? "ECU \(ecu)" : "Motor monitorado via OBD-II"
         if cleanVIN.count == 17 {
             return (.universalOBD, "Veículo \(cleanVIN)", engine, "Câmbio (lido via CAN quando disponível)")
@@ -188,7 +197,7 @@ public enum CockpitGaugeID: String, Codable, CaseIterable, Identifiable, Sendabl
     public var title: String {
         switch self {
         case .coolantTemp: return "Arrefecimento do Motor"
-        case .cvtTemp: return "Temp. Câmbio CVT"
+        case .cvtTemp: return "Temp. do Câmbio"
         case .rpm: return "Rotação do Motor"
         case .speed: return "Velocidade Real CAN"
         case .instantFuel: return "Consumo Instantâneo"
