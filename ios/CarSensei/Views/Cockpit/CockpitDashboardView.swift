@@ -314,13 +314,35 @@ struct CockpitDashboardView: View {
                 .padding(10)
                 .background(Color.white.opacity(0.2), in: Circle())
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("GUARDIÃO TÉRMICO ATIVO")
                     .font(.caption2.weight(.heavy))
                     .foregroundStyle(.white.opacity(0.9))
                 Text(warning)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
+
+                if let validacao = store.cvtValidationMessage {
+                    Text(validacao)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Button {
+                    Task { await store.validateCVTTemperatureReading() }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "waveform.path.ecg")
+                        Text("Conferir leitura agora (hex cru)")
+                    }
+                    .font(.caption.weight(.bold))
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 44)
+                    .background(Color.white.opacity(0.2), in: Capsule())
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
             }
             Spacer()
         }

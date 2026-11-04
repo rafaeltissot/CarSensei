@@ -1274,10 +1274,10 @@ public struct TelemetrySnapshot: Codable, Equatable, Sendable {
                 String(format: "Fluido %@ em %.0f°C! Acima do limite crítico (≥%.0f°C). Risco de DTC P0218 e proteção do câmbio.", t.transmissionName, cvtC, t.criticalDTCThresholdC),
                 .critical
             )
-        } else if cvtC >= t.thermalInterventionC {
+        } else if cvtC >= max(t.thermalInterventionC + 5.0, 120.0) {
             return (
-                "Atenção: Modo Térmico TCU",
-                String(format: "Fluido %@ em %.0f°C (≥%.0f°C). A TCU atua no conversor de torque para resfriamento. Alivie o acelerador em subidas.", t.transmissionName, cvtC, t.thermalInterventionC),
+                "Atenção: Temperatura Alta no Câmbio",
+                String(format: "Fluido %@ em %.0f°C (aviso a partir de %.0f°C; DTC a %.0f°C). Se persistir em uso leve, mande conferir nível e estado do fluido.", t.transmissionName, cvtC, max(t.thermalInterventionC + 5.0, 120.0), t.criticalDTCThresholdC),
                 .attention
             )
         } else if cvtC >= t.warmUpThresholdC {

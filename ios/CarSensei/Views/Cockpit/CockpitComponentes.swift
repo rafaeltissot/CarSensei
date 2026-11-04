@@ -408,12 +408,16 @@ extension CarSenseiStore {
 
         case .cvtTemp:
             let val = t.transmissionTempC.map { String(format: "%.0f", $0) } ?? "--"
-            let over = (t.transmissionTempC ?? 0) >= th.transmission.thermalInterventionC
+            let critico = (t.transmissionTempC ?? 0) >= th.transmission.criticalDTCThresholdC
+            let aviso = (t.transmissionTempC ?? 0) >= max(th.transmission.thermalInterventionC + 5.0, 120.0)
+            let over = critico
             let sub: String
             if t.transmissionTempSuspect {
                 sub = "Leitura suspeita (validando)"
-            } else if over {
-                sub = "ALERTA ≥\(Int(th.transmission.thermalInterventionC))°C"
+            } else if critico {
+                sub = "ALERTA ≥\(Int(th.transmission.criticalDTCThresholdC))°C (DTC)"
+            } else if aviso {
+                sub = "Alta (\(Int(max(th.transmission.thermalInterventionC + 5.0, 120.0)))°C+)"
             } else {
                 sub = "OK ≤\(Int(th.transmission.heavyLoadNormalMaxC))°C"
             }

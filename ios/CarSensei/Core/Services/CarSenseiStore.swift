@@ -46,6 +46,8 @@ public final class CarSenseiStore: ObservableObject {
 
     // Guardião Térmico (CVT e arrefecimento)
     @Published public var activeThermalGuardianBanner: String?
+    /// Resultado da conferência ao vivo da leitura do câmbio (hex cru × interpretado × motor).
+    @Published public var cvtValidationMessage: String?
 
     // Diagnóstico (visão cliente x mecânico)
     @Published public var diagnosticViewMode: DiagnosticViewMode = .customerSimple
@@ -897,10 +899,14 @@ public final class CarSenseiStore: ObservableObject {
         let coolantC = liveTelemetry.coolantTempC ?? 0
         let thresholds = vehicleIdentity.thermalThresholds
 
+        // Faixa normal de fluido CVT é larga (70–110 °C em uso urbano) e a TCU só grava P0218 perto de
+        // 125 °C. Avisar em 115 °C transformava o uso normal em alarme permanente — o banner só aparece
+        // 5 °C abaixo do nível de DTC, e o card continua mostrando o valor em tempo real.
+        let cvtWarningC = max(thresholds.transmission.thermalInterventionC + 5.0, 120.0)
         if cvtC >= thresholds.transmission.criticalDTCThresholdC {
-            activeThermalGuardianBanner = String(format: "Alerta Crítico: Fluido %@ em %.0f°C (≥%.0f°C). Risco de DTC P0218. Reduza o esforço do veículo.", thresholds.transmission.transmissionName, cvtC, thresholds.transmission.criticalDTCThresholdC)
-        } else if cvtC >= thresholds.transmission.thermalInterventionC {
-            activeThermalGuardianBanner = String(format: "Atenção Térmica: Fluido %@ em %.0f°C (≥%.0f°C). A TCU atua no conversor de torque. Alivie acelerações.", thresholds.transmission.transmissionName, cvtC, thresholds.transmission.thermalInterventionC)
+            activeThermalGuardianBanner = String(format: "Alerta Crítico: Fluido %@ em %.0f°C (≥%.0f°C) — no nível em que a TCU grava P0218. Reduza o esforço e mande conferir o fluido.", thresholds.transmission.transmissionName, cvtC, thresholds.transmission.criticalDTCThresholdC)
+        } else if cvtC >= cvtWarningC {
+            activeThermalGuardianBanner = String(format: "Temperatura alta no câmbio: %.0f°C (aviso a partir de %.0f°C; DTC a %.0f°C). Se persistir em uso leve, mande conferir nível/estado do fluido.", cvtC, cvtWarningC, thresholds.transmission.criticalDTCThresholdC)
         } else if coolantC >= thresholds.coolant.criticalDTCThresholdC {
             activeThermalGuardianBanner = String(format: "Perigo de Superaquecimento: Arrefecimento do motor em %.0f°C (≥%.0f°C). Pare o carro em local seguro.", coolantC, thresholds.coolant.criticalDTCThresholdC)
         } else if coolantC >= thresholds.coolant.warningThresholdC {
@@ -908,6 +914,37 @@ public final class CarSenseiStore: ObservableObject {
         } else {
             activeThermalGuardianBanner = nil
         }
+    }
+
+    /// Conferência ao vivo da temperatura do câmbio: mostra o hex cru, o valor interpretado e o motor
+    /// na mesma leitura. É o que separa "leitura errada do app" de "câmbio realmente quente".
+    public func validateCVTTemperatureReading() async {
+        guard connectionState == .connectedReady else {
+            cvtValidationMessage = "Conecte ao scanner para conferir a leitura."
+            return
+        }
+        guard let (resp, _) = try? await protocolEngine.execute("22 0B 37", target: .tcu, timeout: 1.5) else {
+            cvtValidationMessage = "O módulo do câmbio não respondeu agora."
+            return
+        }
+        let bytes = OBDUDSParser.extractPayloadBytes(from: resp)
+        let hex = bytes.isEmpty ? "(resposta vazia)" : bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
+        let parsed = OBDUDSParser.parseTCUFluidTempC(resp)
+        let coolant = liveTelemetry.coolantTempC
+
+        var msg = "Câmbio: \(hex)"
+        if let parsed { msg += " → \(Int(parsed)) °C" }
+        if let coolant { msg += " · Motor: \(Int(coolant)) °C" }
+        if let parsed, let coolant, coolant > 60, abs(parsed - coolant) > 45 {
+            msg += " · divergência alta entre câmbio e motor: possível erro de decodificação."
+        }
+        cvtValidationMessage = msg
+
+        TissotFeedback.log("TCU_TEMP_VALIDATION", [
+            "hex": hex,
+            "parsed_c": parsed.map { String(format: "%.0f", $0) } ?? "nil",
+            "coolant_c": coolant.map { String(format: "%.0f", $0) } ?? "nil"
+        ])
     }
 
     // MARK: - Persistência
