@@ -409,17 +409,22 @@ extension CarSenseiStore {
         case .cvtTemp:
             let val = t.transmissionTempC.map { String(format: "%.0f", $0) } ?? "--"
             let over = (t.transmissionTempC ?? 0) >= th.transmission.thermalInterventionC
-            let sub = over
-                ? "ALERTA ≥\(Int(th.transmission.thermalInterventionC))°C"
-                : "OK ≤\(Int(th.transmission.heavyLoadNormalMaxC))°C"
+            let sub: String
+            if t.transmissionTempSuspect {
+                sub = "Leitura suspeita (validando)"
+            } else if over {
+                sub = "ALERTA ≥\(Int(th.transmission.thermalInterventionC))°C"
+            } else {
+                sub = "OK ≤\(Int(th.transmission.heavyLoadNormalMaxC))°C"
+            }
             return GaugeMetricPresentation(
                 value: val,
                 unit: "°C",
                 compactText: "\(val)°C",
                 subtitle: sub,
-                tint: over ? .red : .teal,
-                progress: ((t.transmissionTempC ?? 40) - 40) / 90.0,
-                isAlerting: over
+                tint: t.transmissionTempSuspect ? Color.secondary : (over ? .red : .teal),
+                progress: t.transmissionTempSuspect ? 0 : ((t.transmissionTempC ?? 40) - 40) / 90.0,
+                isAlerting: over && !t.transmissionTempSuspect
             )
 
         case .intakeAirTemp:

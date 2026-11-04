@@ -1117,6 +1117,9 @@ public struct TelemetrySnapshot: Codable, Equatable, Sendable {
     public var ethanolFuelPct: Double?            // PID 01 52 (só quando a ECU informa)
     public var batteryVoltage: Double?            // AT RV / PID 01 42
     public var transmissionTempC: Double?         // TCU UDS 22 0B 37 / TCM
+    /// `true` quando a leitura do câmbio é fisicamente impossível para o estado do motor (ex.: motor frio
+    /// e câmbio muito mais quente). Nesse caso o valor é descartado em vez de virar alarme falso.
+    public var transmissionTempSuspect: Bool = false
     public var tcuOdometerKm: Double?             // TCU UDS 22 0B 5B
     public var ambientTempC: Double?              // PID 01 46 / HVAC UDS
     public var fuelRateLitersPerHour: Double?     // Real-time fuel flow (L/h)
@@ -1210,6 +1213,11 @@ public struct TelemetrySnapshot: Codable, Equatable, Sendable {
     /// Avaliação precisa da temperatura do fluido do câmbio CVT com base nas especificações oficiais da montadora.
     public func transmissionHealthAssessment(with customThresholds: TransmissionThermalThresholds? = nil) -> (statusTitle: String, detailText: String, level: HealthLevel) {
         guard let cvtC = transmissionTempC else {
+            if transmissionTempSuspect {
+                return ("Leitura suspeita do câmbio",
+                        "O módulo devolveu uma temperatura incompatível com o motor (frio × câmbio quente). O valor foi descartado para não dar alarme falso; a decodificação está em validação.",
+                        .unknown)
+            }
             return ("Lendo TCU...", "Monitorando fluido do câmbio via UDS 22 0B 37.", .unknown)
         }
         let t = customThresholds ?? VehicleBrandProfile.autoDetect.thermalThresholds.transmission

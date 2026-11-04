@@ -95,6 +95,8 @@ public final class CarSenseiStore: ObservableObject {
     let autoStartTripAnalysisKey = "carsensei.tripAnalysis.autoStart.v1"
     let tripAnalysisReportsKey = "carsensei.tripAnalysis.reports.v1"
     private var didRetryVINInSession: Bool = false
+    /// Uma captura do hex cru da temperatura do câmbio por sessão (diagnóstico do relato #109).
+    private var didLogRawCVTTempOnce: Bool = false
     /// Uma reconexão por sessão depois de handshake sem resposta (evita laço de reconectar para sempre).
     private var didReconnectAfterHandshakeTimeout: Bool = false
     /// Início e máximos da viagem atual (para o histórico de viagens).
@@ -669,9 +671,29 @@ public final class CarSenseiStore: ObservableObject {
 
                     // 3. vLinker MC+: TCU (temperatura e odômetro do CVT) a cada 5 ciclos
                     if cycleCounter % 5 == 0 && self.vehicleIdentity.adapterTier.isAdvancedVLinker {
-                        if let (cvtResp, _) = try? await self.protocolEngine.execute("22 0B 37", target: .tcu, timeout: 1.2),
-                           let cvtC = OBDUDSParser.parseTCUFluidTempC(cvtResp) {
-                            self.liveTelemetry.transmissionTempC = cvtC
+                        if let (cvtResp, _) = try? await self.protocolEngine.execute("22 0B 37", target: .tcu, timeout: 1.2) {
+                            // Uma captura por sessão: sem o hex cru não dá para provar se o byte é o do fluido
+                            // e se o offset é -40 (relato #109). Vai no próximo relato enviado.
+                            if !self.didLogRawCVTTempOnce {
+                                self.didLogRawCVTTempOnce = true
+                                let hex = OBDUDSParser.extractPayloadBytes(from: cvtResp).map { String(format: "%02X", $0) }.joined(separator: " ")
+                                TissotFeedback.log("TCU_TEMP_RAW", [
+                                    "hex": hex,
+                                    "parsed_c": OBDUDSParser.parseTCUFluidTempC(cvtResp).map { String(format: "%.0f", $0) } ?? "nil",
+                                    "coolant_c": self.liveTelemetry.coolantTempC.map { String(format: "%.0f", $0) } ?? "nil"
+                                ])
+                            }
+                            if let cvtC = OBDUDSParser.parseTCUFluidTempC(cvtResp) {
+                                // Sanidade física: com o motor frio o fluido do câmbio não pode estar muito acima
+                                // do arrefecimento — se estiver, a decodificação está errada e não pode virar alarme.
+                                if let coolant = self.liveTelemetry.coolantTempC, coolant < 45, cvtC > coolant + 25 {
+                                    self.liveTelemetry.transmissionTempC = nil
+                                    self.liveTelemetry.transmissionTempSuspect = true
+                                } else {
+                                    self.liveTelemetry.transmissionTempC = cvtC
+                                    self.liveTelemetry.transmissionTempSuspect = false
+                                }
+                            }
                         }
                         if let (tcuOdoResp, _) = try? await self.protocolEngine.execute("22 0B 5B", target: .tcu, timeout: 1.2),
                            let tcuKm = OBDUDSParser.parseTCUOdometerKm(tcuOdoResp) {
