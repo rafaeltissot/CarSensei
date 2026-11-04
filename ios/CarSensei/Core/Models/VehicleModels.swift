@@ -1067,6 +1067,24 @@ public struct TripRecord: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+/// Abastecimento detectado pela subida do nível do tanque (PID 01 2F), esperando confirmação do usuário.
+public struct FuelFillUpDraft: Identifiable, Equatable, Sendable {
+    public let id = UUID()
+    public var detectedAt: Date
+    public var odometerKm: Double?
+    /// Variação do nível em pontos percentuais (ex.: 38 = subiu 38% do tanque).
+    public var deltaPct: Double
+    /// Litros estimados por `deltaPct × capacidade`, para o usuário só corrigir com o valor da bomba.
+    public var estimatedLiters: Double
+
+    public init(detectedAt: Date = Date(), odometerKm: Double?, deltaPct: Double, estimatedLiters: Double) {
+        self.detectedAt = detectedAt
+        self.odometerKm = odometerKm
+        self.deltaPct = deltaPct
+        self.estimatedLiters = estimatedLiters
+    }
+}
+
 /// Abastecimento registrado pelo usuário: base da média real (tanque a tanque) e do fator de calibração
 /// aplicado sobre a estimativa do OBD.
 public struct FuelFillUp: Codable, Equatable, Sendable {

@@ -36,6 +36,12 @@ public final class CarSenseiStore: ObservableObject {
     /// Litros e km acumulados desde o último abastecimento — é o que calibra a estimativa do OBD.
     @Published public var litersSinceFillUp: Double = 0
     @Published public var kmSinceFillUp: Double = 0
+    /// Abastecimento detectado pela subida do nível do tanque, aguardando confirmação.
+    @Published public var pendingFillUp: FuelFillUpDraft?
+    /// Capacidade do tanque (usada só para estimar litros até o usuário confirmar na bomba).
+    @Published public var tankCapacityLiters: Double = 50 {
+        didSet { UserDefaults.standard.set(tankCapacityLiters, forKey: tankCapacityKey) }
+    }
     @Published public var lastBatterySnapshot: BatteryTripSnapshot?
 
     // Guardião Térmico (CVT e arrefecimento)
@@ -101,6 +107,11 @@ public final class CarSenseiStore: ObservableObject {
     private let sessionFuelKey = "carsensei.session.fuel.v1"
     private let litersSinceFillKey = "carsensei.fuel.sincefill.l.v1"
     private let kmSinceFillKey = "carsensei.fuel.sincefill.km.v1"
+    private let tankCapacityKey = "carsensei.fuel.tank.capacity.v1"
+    /// Última leitura de nível (PID 01 2F) e quanto já subiu desde que o carro parou.
+    private var lastFuelLevelPct: Double?
+    private var fuelRiseAccumPct: Double = 0
+    private var fuelRiseStartedAt: Date?
     let batterySnapshotKey = "carsensei.battery.snapshot.v1"
     private let enabledGaugesKey = "carsensei.enabled.gauges.v1"
     private let carPlaySlotsKey = "carsensei.carplay.slots.v1"
@@ -318,6 +329,60 @@ public final class CarSenseiStore: ObservableObject {
     public func resetCarPlaySlotsToDefault() {
         carPlaySlotGauges = CockpitGaugeID.defaultCarPlaySlots
         saveCarPlaySlotPreferences()
+    }
+
+    /// Detecta abastecimento pela subida do nível do tanque com o carro parado.
+    /// A boia não diz quanto entrou, mas diz que entrou — então o app pré-preenche e o usuário só confirma.
+    private func considerFuelLevelForFillUp() {
+        guard let level = liveTelemetry.fuelTankLevelPct else { return }
+        let parado = (liveTelemetry.speedKmh ?? 0) < 3.0
+
+        guard parado else {
+            // Em movimento a boia balança: zera a janela para não somar ruído.
+            fuelRiseAccumPct = 0
+            fuelRiseStartedAt = nil
+            lastFuelLevelPct = level
+            return
+        }
+
+        if let last = lastFuelLevelPct {
+            let delta = level - last
+            if delta > 1.0 {
+                if fuelRiseStartedAt == nil { fuelRiseStartedAt = Date() }
+                fuelRiseAccumPct += delta
+            } else if delta < -5.0 {
+                fuelRiseAccumPct = 0
+                fuelRiseStartedAt = nil
+            }
+        }
+        lastFuelLevelPct = level
+
+        // 15%+ de tanque com o carro parado = abastecimento (25 L num tanque de 50 L).
+        if fuelRiseAccumPct >= 15, pendingFillUp == nil {
+            let litros = (fuelRiseAccumPct / 100.0) * tankCapacityLiters
+            pendingFillUp = FuelFillUpDraft(
+                odometerKm: liveTelemetry.tcuOdometerKm,
+                deltaPct: fuelRiseAccumPct,
+                estimatedLiters: litros
+            )
+            TissotFeedback.log("FUEL_FILLUP_DETECTED", [
+                "delta_pct": String(format: "%.0f", fuelRiseAccumPct),
+                "estimated_l": String(format: "%.1f", litros),
+                "odometer": liveTelemetry.tcuOdometerKm.map { String(format: "%.0f", $0) } ?? "nil"
+            ])
+            fuelRiseAccumPct = 0
+            fuelRiseStartedAt = nil
+        }
+    }
+
+    /// Usuário confirmou o abastecimento detectado (com os litros reais da bomba).
+    public func confirmPendingFillUp(odometerKm: Double, liters: Double) {
+        registerFillUp(odometerKm: odometerKm, liters: liters)
+        pendingFillUp = nil
+    }
+
+    public func dismissPendingFillUp() {
+        pendingFillUp = nil
     }
 
     /// Registra um abastecimento real e recalibra a estimativa do OBD.
@@ -764,6 +829,16 @@ public final class CarSenseiStore: ObservableObject {
                         }
                     }
 
+                    // 3.5 Nível do tanque (PID 01 2F) a cada 10 ciclos: muda devagar e é o que detecta abastecimento
+                    if cycleCounter % 10 == 0,
+                       let (lvlResp, _) = try? await self.protocolEngine.execute("01 2F", target: .broadcast, timeout: 1.0) {
+                        let antes = self.liveTelemetry.fuelTankLevelPct
+                        OBDUDSParser.parseMode01Response(lvlResp, into: &self.liveTelemetry)
+                        if self.liveTelemetry.fuelTankLevelPct != antes {
+                            self.considerFuelLevelForFillUp()
+                        }
+                    }
+
                     // 4. Fluxo de combustível (L/h) e consumo instantâneo/da sessão (km/L)
                     let now = Date()
                     let dt = now.timeIntervalSince(lastSampleDate)
@@ -961,6 +1036,7 @@ public final class CarSenseiStore: ObservableObject {
 
         fuelCalibrationFactor = UserDefaults.standard.object(forKey: fuelCalibrationKey) as? Double ?? 1.0
         litersSinceFillUp = UserDefaults.standard.double(forKey: litersSinceFillKey)
+        tankCapacityLiters = UserDefaults.standard.object(forKey: tankCapacityKey) as? Double ?? 50
         kmSinceFillUp = UserDefaults.standard.double(forKey: kmSinceFillKey)
         liveTelemetry.sessionDistanceKm = UserDefaults.standard.double(forKey: sessionDistanceKey)
         liveTelemetry.sessionFuelLiters = UserDefaults.standard.double(forKey: sessionFuelKey)

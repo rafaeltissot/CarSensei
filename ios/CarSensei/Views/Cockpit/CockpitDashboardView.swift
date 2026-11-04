@@ -123,8 +123,11 @@ struct CockpitDashboardView: View {
                 TissotFeedbackSheet()
             }
             .sheet(isPresented: $showFuelFillUpSheet) {
-                FuelFillUpSheet()
-                    .environmentObject(store)
+                FuelFillUpSheet(
+                    initialOdometerKm: store.pendingFillUp?.odometerKm,
+                    initialLiters: store.pendingFillUp?.estimatedLiters
+                )
+                .environmentObject(store)
             }
             .sheet(isPresented: $showVehicleHistorySheet) {
                 ConnectedVehiclesHistorySheetView()

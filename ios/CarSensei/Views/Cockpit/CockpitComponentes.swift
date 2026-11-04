@@ -1125,7 +1125,14 @@ struct FuelFillUpSheet: View {
 
     @State private var odometro: String = ""
     @State private var litros: String = ""
+    @State private var capacidade: String = ""
     @State private var erro: String?
+
+    init(initialOdometerKm: Double? = nil, initialLiters: Double? = nil) {
+        _odometro = State(initialValue: initialOdometerKm.map { String(format: "%.0f", $0) } ?? "")
+        _litros = State(initialValue: initialLiters.map { String(format: "%.1f", $0) } ?? "")
+        _capacidade = State(initialValue: "")
+    }
 
     private var odometroKm: Double? {
         Double(odometro.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: "."))
@@ -1141,6 +1148,8 @@ struct FuelFillUpSheet: View {
                     TextField("Odômetro do painel (km)", text: $odometro)
                         .keyboardType(.numberPad)
                     TextField("Litros abastecidos", text: $litros)
+                        .keyboardType(.decimalPad)
+                    TextField("Capacidade do tanque (L)", text: $capacidade)
                         .keyboardType(.decimalPad)
                 } header: {
                     Text("Abastecimento")
@@ -1178,7 +1187,13 @@ struct FuelFillUpSheet: View {
                             erro = "Informe o odômetro e os litros (mais de 5 L)."
                             return
                         }
-                        store.registerFillUp(odometerKm: km, liters: l)
+                        if let cap = Double(capacidade.replacingOccurrences(of: ",", with: ".")), cap > 20, cap < 150 {
+                            store.tankCapacityLiters = cap
+                        } else if !capacidade.isEmpty {
+                            erro = "Capacidade do tanque inválida."
+                            return
+                        }
+                        store.confirmPendingFillUp(odometerKm: km, liters: l)
                         dismiss()
                     }
                     .disabled(odometroKm == nil || litrosL == nil)
