@@ -54,17 +54,6 @@ public final class CarSenseiStore: ObservableObject {
     @Published public var isRunningCrankingTest: Bool = false
     @Published public var lastCrankingTest: CrankingBatteryTest?
 
-    // TPMS (pressão dos pneus e pareamento de sensores)
-    @Published public var tpmsSnapshot: TPMSSnapshot?
-    @Published public var isReadingTPMS: Bool = false
-    @Published public var tpmsStatusText: String = ""
-    @Published public var tpmsModuleCandidates: [TPMSModuleCandidate] = []
-    /// Endereço do módulo TPMS confirmado nesta sessão (descoberto ou lido do histórico), para reusar na leitura.
-    @Published public var confirmedTPMSModule: TPMSModuleCandidate?
-    @Published public var pairingStage: TPMSPairingStage = .idle
-    @Published public var pairingLog: [TPMSPairingLogEntry] = []
-    @Published public var isPairingTPMS: Bool = false
-
     // Registro em memória dos últimos 80 comandos enviados ao carro (só no aparelho)
     @Published public var commandTraceLog: [CommandTraceEntry] = []
 
@@ -103,10 +92,11 @@ public final class CarSenseiStore: ObservableObject {
     private let fuelProfileKey = "carsensei.fuel.profile.v1"
     private let vehicleIdentityKey = "carsensei.vehicle.identity.v1"
     private let vehiclesHistoryKey = "carsensei.vehicles.history.v1"
-    let tpmsModuleKey = "carsensei.tpms.module.v1"
     let autoStartTripAnalysisKey = "carsensei.tripAnalysis.autoStart.v1"
     let tripAnalysisReportsKey = "carsensei.tripAnalysis.reports.v1"
     private var didRetryVINInSession: Bool = false
+    /// Uma reconexão por sessão depois de handshake sem resposta (evita laço de reconectar para sempre).
+    private var didReconnectAfterHandshakeTimeout: Bool = false
     /// Início e máximos da viagem atual (para o histórico de viagens).
     private var tripStartDate: Date?
     private var tripMaxCoolantC: Double?
@@ -484,6 +474,7 @@ public final class CarSenseiStore: ObservableObject {
                 "protocol": vehicleIdentity.obdProtocol
             ])
 
+            didReconnectAfterHandshakeTimeout = false
             connectionState = .connectedReady
             statusBannerText = "Conectado: \(vehicleIdentity.cleanModelTitle) • \(vehicleIdentity.adapterTier.isAdvancedVLinker ? "vLinker MC+ PRO" : "Modo Básico OBD")"
             startTelemetryLoop()
@@ -498,6 +489,16 @@ public final class CarSenseiStore: ObservableObject {
                     "code": nsError.code,
                     "reason": error.localizedDescription
                 ])
+                // Estourou tempo com o adaptador ainda conectado: ele saiu do sono fundo e ficou mudo.
+                // Em vez de parar em erro, derruba e refaz o link — o transporte volta e o handshake roda de novo.
+                if nsError.code == -3,
+                   bleManager.connectionState == .initializingProtocol,
+                   !didReconnectAfterHandshakeTimeout {
+                    didReconnectAfterHandshakeTimeout = true
+                    statusBannerText = "Adaptador sem resposta. Reconectando para concluir a inicialização..."
+                    bleManager.reconnectActivePeripheral()
+                    return
+                }
                 if bleManager.connectionState != .connectedReady && bleManager.connectionState != .initializingProtocol {
                     connectionState = .disconnected
                     statusBannerText = "Scanner desconectado. Aproxime-se do veículo com a ignição ligada."
@@ -566,9 +567,6 @@ public final class CarSenseiStore: ObservableObject {
             // Trocou de veículo: limpa leituras de sessão do carro anterior para nunca misturar dados entre veículos
             activeFaults = []
             lastDTCScanDate = nil
-            tpmsSnapshot = nil
-            confirmedTPMSModule = nil
-            UserDefaults.standard.removeObject(forKey: tpmsModuleKey)
         }
 
         applyDetectedProfile()
@@ -938,11 +936,6 @@ public final class CarSenseiStore: ObservableObject {
         if let historyData = UserDefaults.standard.data(forKey: vehiclesHistoryKey),
            let decodedHistory = try? JSONDecoder().decode([DecodificavelTolerante<ConnectedVehicleRecord>].self, from: historyData) {
             connectedVehiclesHistory = decodedHistory.compactMap { $0.valor }
-        }
-
-        if let tpmsData = UserDefaults.standard.data(forKey: tpmsModuleKey),
-           let decodedModule = try? JSONDecoder().decode(TPMSModuleCandidate.self, from: tpmsData) {
-            confirmedTPMSModule = decodedModule
         }
 
         if UserDefaults.standard.object(forKey: autoStartTripAnalysisKey) != nil {

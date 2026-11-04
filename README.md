@@ -32,7 +32,6 @@
 | ⛽ **Consumo e viagens** | Fluxo (`L/h`), consumo (`km/L`) e média da viagem por `MAF` ou Speed-Density (`MAP` + `IAT` + `RPM` + ajustes de mistura), com o etanol do tanque (`PID 01 52`) quando a ECU informa. Histórico e relatório em PDF. |
 | 🩺 **Diagnóstico em dupla visão** | Falhas OBD-II (`03` / `07`) e UDS (`19 02`) de todos os módulos que respondem. **Visão Cliente:** explicação simples e "Posso continuar dirigindo?". **Visão Mecânico:** código + Failure Type Byte, máscara de status, endereços CAN e snapshot `19 04`. |
 | 🛡️ **Auditoria de KM** | Compara o painel com o que os módulos guardam: VIN de cada módulo (`22 F1 90`), odômetro do câmbio quando existe, distância desde a última limpeza (`01 31`) e KM nos registros de falha (`19 03` + `19 04`). Sem provas lidas, o laudo diz "Inconclusivo". |
-| 🛞 **Pneus (TPMS)** | Procura o módulo de pneus no barramento e mostra pressão, temperatura e ID de cada sensor. Assistente de pareamento experimental para sensores novos. |
 | 🔒 **Trava KOEO** | Apagar falhas (`14 FF FF FF` / `04`) só com ignição ligada, motor desligado (0 RPM) e carro parado, conferido na hora pelo CAN. |
 
 ## 💰 Planos (StoreKit 2)
@@ -52,7 +51,7 @@ CarSensei/
 │       ├── Core/Bluetooth/ # BLE e motor de protocolo (endereçamento CAN atômico)
 │       ├── Core/Parser/    # OBD-II modo 01/03/07/09 e UDS $19/$22, TPMS
 │       ├── Core/Services/  # CarSenseiStore (+Diagnóstico, +Auditoria, +TPMS, +Viagem), Loja
-│       └── Views/          # Cockpit, Viagem, Diagnóstico, Pneus, Ajustes, CarPlay, Planos
+│       └── Views/          # Cockpit, Viagem, Diagnóstico, Ajustes, CarPlay, Planos
 └── scripts/                # Verificações do parser e da persistência
 ```
 

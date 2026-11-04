@@ -92,56 +92,6 @@ struct VerifyParser {
         assert(OdometerIntegrityVerdict.decide(critical: false, attention: false, tcuMatchesCluster: true, proofsRead: 1) == .verifiedIntact)
         assert(OdometerIntegrityVerdict.decide(critical: true, attention: false, tcuMatchesCluster: true, proofsRead: 3) == .tamperingConfirmed)
 
-        // 7. TPMS: pressão por byte (kPa direto, 0xDC = 220 kPa) e descarte de 00/FF
-        assert(OBDUDSParser.tpmsPressureKpa(fromByte: 0xDC) == 220.0, "0xDC deve virar 220 kPa")
-        assert(OBDUDSParser.tpmsPressureKpa(fromByte: 0x00) == nil && OBDUDSParser.tpmsPressureKpa(fromByte: 0xFF) == nil)
-        assert(OBDUDSParser.tpmsTemperatureC(fromByte: 0x3C) == 20.0, "0x3C deve virar 20 °C (A-40)")
-
-        // Bloco de 4 pressões num DID (62 F4 05 + 4 bytes)
-        let block = OBDUDSParser.tpmsPressureBlock(fromUDS: "7A8 07 62 F4 05 DC DA D8 E0 >", wheelCount: 4)
-        assert(block == [220.0, 218.0, 216.0, 224.0], "Esperado bloco de 4 pressões, veio \(block)")
-
-        // Escala de 2.5 kPa/bit (0x5C = 92 * 2.5 = 230 kPa) e struct intercalado [Press, Temp, Status] * 4
-        let stridedBlock = OBDUDSParser.tpmsPressureBlock(
-            fromUDS: "750 10 0F 62 D0 01 5C 41 00 5B 42 00 5A 41 00 5D 40 00 >",
-            wheelCount: 4
-        )
-        assert(stridedBlock == [230.0, 227.5, 225.0, 232.5], "Esperado bloco 2.5 kPa/bit intercalado, veio \(stridedBlock)")
-        let stridedTemps = OBDUDSParser.tpmsTemperatureBlock(
-            fromUDS: "750 10 0F 62 D0 01 5C 41 00 5B 42 00 5A 41 00 5D 40 00 >",
-            wheelCount: 4
-        )
-        assert(stridedTemps == [25.0, 26.0, 25.0, 24.0], "Esperado 4 temperaturas intercaladas, veio \(stridedTemps)")
-
-        // IDs de sensor (4 bytes), ignorando quadros 00000000 e FFFFFFFF
-        let tpmsIDs = OBDUDSParser.tpmsSensorIDs(fromUDS: "7A8 10 14 62 C1 00 4A 2F 10 C8 5B 3E 22 91 00 00 00 00 FF FF FF FF >")
-        assert(tpmsIDs == ["4A2F10C8", "5B3E2291"], "Esperado 2 IDs válidos, veio \(tpmsIDs)")
-
-        // 9. TPMS no barramento: o painel mostra a pressão mas o módulo não responde UDS.
-        //    Primeiro quebra a saída do monitor em [ID: bytes].
-        let monitor = """
-        7E8 06 41 00 BE 3F A8 13
-        500 00 00 00 00 02 1C 10 00
-        501 00 20 51 00 00 00 24 00
-        """
-        let frames = OBDUDSParser.parseCANFrames(monitor)
-        assert(frames.count == 3, "esperado 3 IDs, veio \(frames.keys.sorted())")
-        assert(frames["500"]?.count == 8, "0x500 deve ter 8 bytes")
-        assert(frames["501"] == [0x00, 0x20, 0x51, 0x00, 0x00, 0x00, 0x24, 0x00])
-
-        // 4 pressões em kPa direto dentro de um quadro (0xDC = 220 kPa)
-        let canBlock = OBDUDSParser.tpmsPressureBlock(fromCANBytes: [0x00, 0xDC, 0xDA, 0xD8, 0xE0, 0x00])
-        assert(canBlock == [220.0, 218.0, 216.0, 224.0], "esperado as 4 pressões, veio \(canBlock)")
-
-        // Struct intercalada por roda: pressão, temperatura, status...
-        let interleaved = OBDUDSParser.tpmsPressureBlock(fromCANBytes: [0xDC, 0x40, 0xDA, 0x41, 0xD8, 0x42, 0xE0, 0x43])
-        assert(interleaved == [220.0, 218.0, 216.0, 224.0], "esperado intercalado, veio \(interleaved)")
-
-        // Não pode inventar pneu: zeros, FF e bytes baixos demais são "sem sensor"
-        assert(OBDUDSParser.tpmsPressureBlock(fromCANBytes: [0, 0, 0, 0, 0, 0, 0, 0]).isEmpty)
-        assert(OBDUDSParser.tpmsPressureBlock(fromCANBytes: [0xFF, 0xFF, 0xFF, 0xFF]).isEmpty)
-        assert(OBDUDSParser.tpmsPressureBlock(fromCANBytes: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06]).isEmpty)
-
         // 8. NRC (resposta negativa UDS): a tela precisa dizer POR QUE o módulo recusou a escrita
         let negSecurity = UDSDiagnostic.negativeResponse(in: "7E8 03 7F 2E 33 >")
         assert(negSecurity?.service == 0x2E && negSecurity?.nrc == 0x33, "esperado 7F 2E 33, veio \(String(describing: negSecurity))")

@@ -77,8 +77,9 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
 
     /// Limites gerais, válidos para a maioria dos motores e câmbios automáticos/CVT.
     /// Não são de nenhum carro específico: o alerta é preventivo, a própria TCU/ECM protege o conjunto.
-    public var thermalThresholds: VehicleThermalThresholds {
-        VehicleThermalThresholds(
+    /// `static let`: uma única instância inicializada, em vez de reconstruir a struct a cada leitura de
+    /// mostrador (eram ~22 construções por frame) — e some a chance de leitura desalinhada que gerou o SIGBUS.
+    private static let generalThermalThresholds = VehicleThermalThresholds(
             transmission: TransmissionThermalThresholds(
                 transmissionName: "Câmbio automático / CVT",
                 warmUpThresholdC: 60.0,
@@ -98,7 +99,8 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
                 officialEngineeringReference: "Faixa geral de arrefecimento pressurizado (normal entre 85°C e 105°C)"
             )
         )
-    }
+
+    public var thermalThresholds: VehicleThermalThresholds { Self.generalThermalThresholds }
 
     /// Monta a descrição só com o que o carro devolveu (VIN, nome da ECU, calibração). Nenhuma tabela de marcas.
     public static func detect(fromVIN vin: String, ecuName: String, calibrationId: String) -> (profile: VehicleBrandProfile, modelName: String, engineDesc: String, transmissionDesc: String) {
@@ -1777,7 +1779,7 @@ public struct CommandTraceEntry: Identifiable, Codable, Equatable, Sendable {
 
 // MARK: - Decodificação tolerante dos dados salvos no aparelho
 //
-// Viagens, falhas, laudo de KM, garagem, TPMS e HVAC são gravados com `JSONEncoder` em `UserDefaults` e
+// Viagens, falhas, laudo de KM e garagem são gravados com `JSONEncoder` em `UserDefaults` e
 // relidos com `try?`. Com o `init(from:)` sintetizado, um campo novo no modelo (ou um texto de enum alterado)
 // fazia o decode do array inteiro falhar — e o histórico do usuário desaparecia sem aviso, porque o `try?`
 // devolvia `nil` e o app recomeçava vazio. Estes helpers trocam o campo ausente/inválido pelo padrão.

@@ -124,6 +124,35 @@ public final class BLEConnectionManager: NSObject, ObservableObject {
         statusDetail = "Desconectado do vLinker MC-IOS"
     }
 
+    /// Reconexão ativa: derruba o link para forçar `didConnect` → descoberta GATT → `onAdapterTransportReady`
+    /// outra vez. Usado quando o handshake estoura tempo com o adaptador ainda "conectado" mas mudo
+    /// (saiu de BatterySaver profundo). Sem isso o app ficava parado em erro até reconectar na mão.
+    public func reconnectActivePeripheral() {
+        guard let peripheral = activePeripheral else {
+            startScanning(autoConnectPreferred: true)
+            return
+        }
+        userRequestedDisconnect = false
+        timeoutTask?.cancel()
+        failPendingCommand(message: "Reconectando ao vLinker")
+        writeCharacteristic = nil
+        notifyCharacteristic = nil
+        transportReadyFired = false
+        servicesAwaitingCharacteristics = 0
+        connectionState = .connecting
+        statusDetail = "Reconectando ao vLinker para concluir a inicialização..."
+        centralManager.cancelPeripheralConnection(peripheral)
+        // `didDisconnectPeripheral` reconecta sozinho (userRequestedDisconnect == false).
+        // Se em 2 s o link não voltar, tenta um connect direto.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard let self,
+                  self.connectionState != .connectedReady,
+                  self.centralManager.state == .poweredOn else { return }
+            self.centralManager.connect(peripheral, options: nil)
+        }
+    }
+
     /// Sends an ASCII command terminated with `\r` and awaits the `>` prompt from vLinker MC+.
     public func sendRawCommand(_ command: String, timeoutSeconds: Double = 3.5) async throws -> String {
         guard let peripheral = activePeripheral,
@@ -182,71 +211,6 @@ public final class BLEConnectionManager: NSObject, ObservableObject {
                 offset = end
             }
         }
-    }
-
-    /// Executa um comando de escuta passiva (`STM` ou `AT MA`) por `durationSeconds`, envia `\r` para encerrar
-    /// a escuta no chip STN/ELM e devolve todos os quadros capturados na janela (mesmo sem `>` antes do tempo).
-    public func captureMonitorWindow(_ command: String, durationSeconds: Double = 1.0) async throws -> String {
-        guard let peripheral = activePeripheral,
-              let writeChar = writeCharacteristic else {
-            throw NSError(domain: "CarSensei.BLE", code: -1, userInfo: [NSLocalizedDescriptionKey: "vLinker MC-IOS não está conectado"])
-        }
-
-        if let stale = pendingContinuation {
-            pendingContinuation = nil
-            stale.resume(throwing: CancellationError())
-        }
-        timeoutTask?.cancel()
-        if discardUntilPrompt {
-            for _ in 0..<12 where discardUntilPrompt {
-                try? await Task.sleep(nanoseconds: 25_000_000)
-            }
-            discardUntilPrompt = false
-        }
-        responseBuffer = ""
-
-        let payloadString = command.hasSuffix("\r") ? command : "\(command)\r"
-        guard let data = payloadString.data(using: .utf8) else {
-            throw NSError(domain: "CarSensei.BLE", code: -2, userInfo: [NSLocalizedDescriptionKey: "Comando inválido"])
-        }
-
-        let writeType: CBCharacteristicWriteType = writeChar.properties.contains(.writeWithoutResponse)
-            ? .withoutResponse
-            : .withResponse
-
-        let captured: String = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-            self.pendingContinuation = continuation
-
-            self.timeoutTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: UInt64(durationSeconds * 1_000_000_000))
-                guard !Task.isCancelled, let self = self, let pending = self.pendingContinuation else { return }
-                self.pendingContinuation = nil
-                let snapshot = self.responseBuffer
-                self.responseBuffer = ""
-                self.discardUntilPrompt = true
-                // Envia CR para interromper o modo monitor (AT MA / STM) no vLinker
-                if let stopData = "\r".data(using: .utf8) {
-                    peripheral.writeValue(stopData, for: writeChar, type: writeType)
-                }
-                pending.resume(returning: snapshot)
-            }
-
-            let mtu = max(20, peripheral.maximumWriteValueLength(for: writeType))
-            var offset = 0
-            while offset < data.count {
-                let end = min(offset + mtu, data.count)
-                let chunk = data.subdata(in: offset..<end)
-                peripheral.writeValue(chunk, for: writeChar, type: writeType)
-                offset = end
-            }
-        }
-
-        // Drena o "STOPPED >" residual antes do próximo comando normal
-        for _ in 0..<14 where discardUntilPrompt {
-            try? await Task.sleep(nanoseconds: 25_000_000)
-        }
-        discardUntilPrompt = false
-        return captured
     }
 
     private func failPendingCommand(message: String) {

@@ -104,20 +104,10 @@ struct VerifyPersistence {
         let laudoFuturo = try decoder.decode(OdometerAuditReport.self, from: vereditoNovo)
         assert(laudoFuturo.verdict == .inconclusive, "veredito desconhecido não pode aprovar o KM")
 
-        // 9. TPMS: módulo antigo sem os campos novos e pneu sem flags explícitas.
-        let moduloAntigo = dados(#"{"txHeader":"7A8","rxHeader":"7B0"}"#)
-        let modulo = try decoder.decode(TPMSModuleCandidate.self, from: moduloAntigo)
-        assert(modulo.txHeader == "7A8")
-        assert(modulo.respondingDIDs.isEmpty && modulo.looksLikeTPMS == false)
-
-        let pneu = try decoder.decode(TireReading.self, from: dados(#"{"position":"frontRight"}"#))
-        assert(pneu.position == .frontRight)
-        assert(pneu.sensorMissing == false && pneu.lowBattery == false)
-
-        // 10. Regressão: dados bons continuam decodificando inteiros (o invólucro tolerante não descarta nada).
+        // 9. Regressão: dados bons continuam decodificando inteiros (o invólucro tolerante não descarta nada).
         let boas = try decoder.decode([DecodificavelTolerante<DiagnosticFault>].self, from: try encoder.encode([falha]))
         assert(boas.compactMap { $0.valor }.count == 1)
 
-        print("✅ Persistência: 10 verificações de decode tolerante passaram (dados antigos preservados).")
+        print("✅ Persistência: 9 verificações de decode tolerante passaram (dados antigos preservados).")
     }
 }

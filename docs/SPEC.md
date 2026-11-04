@@ -62,11 +62,9 @@ São faixas gerais e preventivas; o módulo de cada carro tem as próprias prote
 
 Veredito: **Alerta** se alguma prova reprova; **Atenção** se há divergência sem prova de redução; **KM consistente** só quando o odômetro do câmbio bate com o painel; **Sem indícios (parcial)** quando só limites mínimos passaram; **Inconclusivo** quando nada respondeu. A regra está em `OdometerIntegrityVerdict.decide` e é testada em `scripts/verify_parser.swift`.
 
-## 5. Pneus (TPMS)
+## 5. Pneus (TPMS) — removido
 
-O vLinker não recebe o rádio dos sensores; quem recebe é o módulo de TPMS do carro. O app procura esse módulo (lista de endereços comuns e varredura `7XX`), lê pressão, temperatura e IDs por DIDs candidatos e decodifica as escalas mais comuns (kPa direto, 2,5 kPa/bit, 1,375 kPa/bit, PSI×4). O endereço achado fica salvo por carro.
-
-O pareamento de sensores novos é experimental: tenta a rotina de aprendizado (`31 01`) e a gravação dos IDs (`2E`) com sessão estendida (`10 03`), só depois da confirmação do usuário, e registra cada passo. Se o módulo exigir chave de segurança do fabricante (`27`), o app avisa que não é possível pelo OBD.
+Fora de escopo por decisão de produto (relato de 03/11). O Arrizo 6 não expõe pressão/IDs por UDS no conector OBD (13 módulos sondados, 390 DIDs, nenhum dado de pneu) e não há quadro de barramento com as 4 pressões. A aba e o serviço de TPMS saíram do app; a busca de sensores fica com scanner dedicado.
 
 ## 6. Climatização
 
