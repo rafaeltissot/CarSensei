@@ -277,6 +277,47 @@ public final class CarSenseiStore: ObservableObject {
         clearOtherVehiclesArchivedFaults()
     }
 
+    /// Apaga completamente TODO o histórico do aplicativo: viagens, relatórios de sensores,
+    /// histórico de veículos conectados, falhas arquivadas e zera os contadores acumulados de combustível e km.
+    public func clearAllAppHistoryAndCounters() {
+        // 1. Viagens e relatórios de sensores
+        tripHistory.removeAll()
+        UserDefaults.standard.removeObject(forKey: tripHistoryKey)
+
+        tripAnalysisReportsHistory.removeAll()
+        latestTripAnalysisReport = nil
+        UserDefaults.standard.removeObject(forKey: tripAnalysisReportsKey)
+
+        // 2. Veículos e falhas
+        connectedVehiclesHistory.removeAll()
+        UserDefaults.standard.removeObject(forKey: vehiclesHistoryKey)
+
+        archivedSnapshots.removeAll()
+        UserDefaults.standard.removeObject(forKey: archivedFaultsKey)
+
+        odometerReport = nil
+        UserDefaults.standard.removeObject(forKey: odometerReportKey)
+
+        // 3. Contadores de consumo e hodômetros de sessão
+        liveTelemetry.sessionDistanceKm = 0.0
+        liveTelemetry.sessionFuelLiters = 0.0
+        UserDefaults.standard.removeObject(forKey: sessionDistanceKey)
+        UserDefaults.standard.removeObject(forKey: sessionFuelKey)
+
+        litersSinceFillUp = 0.0
+        kmSinceFillUp = 0.0
+        UserDefaults.standard.removeObject(forKey: litersSinceFillKey)
+        UserDefaults.standard.removeObject(forKey: kmSinceFillKey)
+
+        lastFillUp = nil
+        UserDefaults.standard.removeObject(forKey: lastFillUpKey)
+
+        lastBatterySnapshot = nil
+        UserDefaults.standard.removeObject(forKey: batterySnapshotKey)
+
+        lastCrankingTest = nil
+    }
+
     // MARK: - Gauge Customization
 
     public func isGaugeEnabled(_ id: CockpitGaugeID) -> Bool {
@@ -1032,6 +1073,12 @@ public final class CarSenseiStore: ObservableObject {
     }
 
     private func loadPersistedState() {
+        let wipeFlagKey = "carsensei.history.wipe.v1.2.0.build4"
+        if !UserDefaults.standard.bool(forKey: wipeFlagKey) {
+            UserDefaults.standard.set(true, forKey: wipeFlagKey)
+            clearAllAppHistoryAndCounters()
+        }
+
         // Preferências de mostradores: lê como texto e descarta só os gauges que não existem mais,
         // em vez de voltar para "todos" quando um caso é renomeado.
         if let savedGaugesData = UserDefaults.standard.data(forKey: enabledGaugesKey),

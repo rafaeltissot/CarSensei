@@ -80,13 +80,13 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
     /// acoplado ao radiador de 95-105°C, o fluido do câmbio opera normalmente até 115°C.
     private static let generalThermalThresholds = VehicleThermalThresholds(
             transmission: TransmissionThermalThresholds(
-                transmissionName: "Câmbio automático",
+                transmissionName: "Câmbio CVT25",
                 warmUpThresholdC: 60.0,
                 nominalMaxC: 105.0,
                 heavyLoadNormalMaxC: 115.0,
                 thermalInterventionC: 120.0,
                 criticalDTCThresholdC: 125.0,
-                officialEngineeringReference: "Faixa operacional Aisin 4AT / Automático (normal até 115°C sob tráfego urbano/carga; alerta preventivo 120°C; DTC P0218 a 125°C)"
+                officialEngineeringReference: "Wanliyang CVT25 / Chery Arrizo 6 (normal até 115°C sob tráfego urbano/carga; alerta TCU 120°C; DTC P0218 a 125°C)"
             ),
             coolant: CoolantThermalThresholds(
                 engineDesc: "Motor a combustão",
@@ -107,13 +107,13 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
         let ecu = ecuName.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasECU = !ecu.isEmpty && !ecu.contains("Aguardando")
 
-        // CAOA Chery Tiggo 2 (WMI 98R = Chery Brasil; VDS DC21 = Tiggo 2 1.5 16V Flex)
+        // CAOA Chery Arrizo 6 (WMI 98R = Chery Brasil; VDS DC21 = Arrizo 6 1.5 Turbo Flex)
         if cleanVIN.hasPrefix("98RDC21") {
-            let engine = hasECU ? "1.5 16V Flex SQRD4G15B • \(ecu)" : "1.5 16V Flex SQRD4G15B"
-            return (.universalOBD, "CAOA Chery Tiggo 2 1.5", engine, "Câmbio Automático 4AT Aisin (Fluido ATF)")
+            let engine = hasECU ? "1.5 Turbo Flex SQRE4T15C • \(ecu)" : "1.5 Turbo Flex SQRE4T15C"
+            return (.universalOBD, "CAOA Chery Arrizo 6 1.5 Turbo", engine, "Câmbio Wanliyang CVT25 (Fluido CVT)")
         } else if cleanVIN.hasPrefix("98R") {
             let engine = hasECU ? "Motor Chery Flex • \(ecu)" : "Motor Chery Flex"
-            return (.universalOBD, "CAOA Chery (\(cleanVIN.prefix(8)))", engine, "Câmbio Automático / CVT")
+            return (.universalOBD, "CAOA Chery (\(cleanVIN.prefix(8)))", engine, "Câmbio CVT25 / Automático")
         }
 
         let engine = hasECU ? "ECU \(ecu)" : "Motor monitorado via OBD-II"
@@ -197,7 +197,7 @@ public enum CockpitGaugeID: String, Codable, CaseIterable, Identifiable, Sendabl
     public var title: String {
         switch self {
         case .coolantTemp: return "Arrefecimento do Motor"
-        case .cvtTemp: return "Temp. do Câmbio"
+        case .cvtTemp: return "Temp. Câmbio CVT"
         case .rpm: return "Rotação do Motor"
         case .speed: return "Velocidade Real CAN"
         case .instantFuel: return "Consumo Instantâneo"

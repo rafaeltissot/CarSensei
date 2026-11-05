@@ -5,6 +5,8 @@ struct SettingsView: View {
     @EnvironmentObject var loja: Loja
     @State private var showScannerSheet = false
     @State private var gerenciandoAssinatura = false
+    @State private var showClearAllHistoryConfirmation = false
+    @State private var didClearHistoryBanner = false
     @AppStorage("carsensei.auto_connect_engine_start") private var autoConnectOnLaunch = true
     @AppStorage("carsensei.auto_open_dash_on_connect") private var openDashboardOnConnect = true
 
@@ -122,6 +124,40 @@ struct SettingsView: View {
                     Text("Os adaptadores recomendados vLinker MC-IOS / MC+ utilizam comandos STN e taxas de até 50 PIDs/s com barramento CAN e UDS 2F/22 ativos.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                }
+
+                // MARK: - Limpeza de Dados e Histórico
+                Section("Histórico & Dados do App") {
+                    Button(role: .destructive) {
+                        showClearAllHistoryConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash.fill")
+                                .foregroundStyle(.red)
+                            Text("Apagar Todo o Histórico do App")
+                                .foregroundStyle(.red)
+                            Spacer()
+                        }
+                    }
+                    .confirmationDialog(
+                        "Apagar Todo o Histórico?",
+                        isPresented: $showClearAllHistoryConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Apagar Tudo", role: .destructive) {
+                            store.clearAllAppHistoryAndCounters()
+                            didClearHistoryBanner = true
+                        }
+                        Button("Cancelar", role: .cancel) { }
+                    } message: {
+                        Text("Esta ação apagará permanentemente o histórico de viagens, relatórios de sensores, veículos conectados e zerará as médias acumuladas de consumo.")
+                    }
+
+                    if didClearHistoryBanner {
+                        Text("Todo o histórico foi apagado com sucesso.")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
                 }
 
                 // MARK: - Informações do App & Hardware

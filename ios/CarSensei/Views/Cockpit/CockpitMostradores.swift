@@ -595,7 +595,8 @@ extension CockpitDashboardView {
             subtitle: p.subtitle,
             icon: gauge.iconName,
             accent: p.tint,
-            progress: p.progress
+            progress: p.progress,
+            isAlerting: p.isAlerting
         )
     }
 

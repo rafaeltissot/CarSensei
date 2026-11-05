@@ -756,7 +756,8 @@ struct MultimediaMirrorDashboardView: View {
                                         Text(gauge.title)
                                             .font(.system(size: 10, weight: .heavy))
                                             .foregroundStyle(Tema.texto)
-                                            .lineLimit(1)
+                                            .lineLimit(2)
+                                            .minimumScaleFactor(0.85)
 
                                         Spacer(minLength: 2)
 
@@ -793,7 +794,8 @@ struct MultimediaMirrorDashboardView: View {
                                     Text(gauge.summaryDescription)
                                         .font(.system(size: 8.5, weight: .medium))
                                         .foregroundStyle(Tema.textoSuave)
-                                        .lineLimit(2)
+                                        .lineLimit(nil)
+                                        .fixedSize(horizontal: false, vertical: true)
                                         .multilineTextAlignment(.leading)
 
                                     Text("\(gauge.pidBadge) • \(gauge.category)")

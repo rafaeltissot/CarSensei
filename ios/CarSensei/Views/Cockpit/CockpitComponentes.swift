@@ -863,6 +863,7 @@ struct GaugeCard: View {
     let icon: String
     let accent: Color
     let progress: Double
+    var isAlerting: Bool = false
 
     /// Progresso saneado: telemetria sem leitura pode chegar como NaN/infinito e o `frame(width:)` não aceita isso.
     private var safeProgress: Double {
@@ -870,32 +871,36 @@ struct GaugeCard: View {
         return min(max(progress, 0.04), 1.0)
     }
 
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: icon)
                     .font(.subheadline.bold())
-                    .foregroundStyle(accent)
+                    .foregroundStyle(isAlerting ? .white : accent)
                     .frame(width: 28, height: 28)
-                    .background(accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .background(isAlerting ? Color.red : accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
                 Text(title)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(Tema.textoSuave)
+                    .foregroundStyle(isAlerting ? Color.red : Tema.textoSuave)
                     .lineLimit(1)
                 Spacer()
+                if isAlerting {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption.bold())
+                        .foregroundStyle(.red)
+                }
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
                     .font(.system(.title, design: .rounded, weight: .black))
-                    .foregroundStyle(Tema.texto)
+                    .foregroundStyle(isAlerting ? Color.red : Tema.texto)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(unit)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(isAlerting ? Color.red : accent)
             }
 
             GeometryReader { geo in
@@ -903,7 +908,7 @@ struct GaugeCard: View {
                     Capsule()
                         .fill(Tema.trilho)
                     Capsule()
-                        .fill(accent)
+                        .fill(isAlerting ? Color.red : accent)
                         .frame(width: geo.size.width * safeProgress)
                         .animation(.easeOut(duration: 0.25), value: progress)
                 }
@@ -912,16 +917,16 @@ struct GaugeCard: View {
 
             Text(subtitle)
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(Tema.textoSuave)
+                .foregroundStyle(isAlerting ? Color.red : Tema.textoSuave)
                 .lineLimit(1)
         }
         .padding(14)
-        .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 18))
+        .background(isAlerting ? Color.red.opacity(0.12) : Tema.cartao, in: RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(Tema.borda, lineWidth: 1)
+                .stroke(isAlerting ? Color.red : Tema.borda, lineWidth: isAlerting ? 1.6 : 1)
         )
-        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+        .shadow(color: isAlerting ? Color.red.opacity(0.2) : Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
         .accessibilityValue("\(value) \(unit), \(subtitle)")

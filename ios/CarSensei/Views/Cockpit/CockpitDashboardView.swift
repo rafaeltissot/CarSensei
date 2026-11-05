@@ -33,10 +33,6 @@ struct CockpitDashboardView: View {
                     VStack(spacing: 14) {
                         unifiedVehicleConnectionCard
 
-                        if let thermalWarning = store.activeThermalGuardianBanner {
-                            thermalGuardianAlertBanner(warning: thermalWarning)
-                        }
-
                         customizeGaugesHeader
                         liveGaugesGrid
                         fuelEconomyComputerCard
