@@ -798,16 +798,16 @@ public struct VehicleIdentity: Codable, Equatable, Sendable {
     }
 
     public init(
-        vin: String = "Aguardando Leitura Automática",
+        vin: String = "Aguardando Leitura",
         ecuName: String = "Aguardando ECU",
         calibrationId: String = "Aguardando Calibração",
         obdProtocol: String = "Auto-Negociação ISO 15765-4 CAN",
         adapterFirmware: String = "Aguardando Scanner BLE",
         adapterTier: AdapterCapabilityTier = .unknown,
         detectedBrandProfile: VehicleBrandProfile = .autoDetect,
-        modelDescription: String = "Veículo conectado via OBD-II",
-        engineCode: String = "Identificação Automática via VIN / ECU",
-        transmissionCode: String = "Mapeamento Automático CAN/UDS",
+        modelDescription: String = "Nenhum Veículo Conectado",
+        engineCode: String = "Aguardando Conexão com Scanner",
+        transmissionCode: String = "Aguardando Conexão com Scanner",
         displacementLiters: Double = 1.500,
         supportedMode01PIDs: [Int] = [],
         ecuReportedFuelType: String? = nil,

@@ -148,29 +148,44 @@ struct CockpitDashboardView: View {
 
     // MARK: - Unified Vehicle & Connection Card
     private var unifiedVehicleConnectionCard: some View {
+        let isConnected = store.connectionState == .connectedReady
         let isPro = store.vehicleIdentity.adapterTier.isAdvancedVLinker
         let id = store.vehicleIdentity
+
+        let modelTitle = isConnected ? id.cleanModelTitle.uppercased() : "NENHUM VEÍCULO CONECTADO"
+        let engineTransText = isConnected
+            ? "\(id.engineCode) • \(id.transmissionCode)"
+            : "Aguardando conexão com scanner vLinker / ignição"
 
         return VStack(alignment: .leading, spacing: 12) {
             // 1. Vehicle Identification Header (top of card)
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(id.cleanModelTitle.uppercased())
+                        Text(modelTitle)
                             .font(.headline.weight(.heavy))
-                            .foregroundStyle(Tema.texto)
+                            .foregroundStyle(isConnected ? Tema.texto : Tema.textoSuave)
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
 
-                        Text(isPro ? "PRO" : "OBD")
-                            .font(.system(size: 10, weight: .black))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(isPro ? Color.blue.opacity(0.15) : Color.orange.opacity(0.15), in: Capsule())
-                            .foregroundStyle(isPro ? Color.blue : Color.orange)
+                        if isConnected {
+                            Text(isPro ? "PRO" : "OBD")
+                                .font(.system(size: 10, weight: .black))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(isPro ? Color.blue.opacity(0.15) : Color.orange.opacity(0.15), in: Capsule())
+                                .foregroundStyle(isPro ? Color.blue : Color.orange)
+                        } else {
+                            Text("DESCONECTADO")
+                                .font(.system(size: 8.5, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.gray.opacity(0.12), in: Capsule())
+                                .foregroundStyle(Color.secondary)
+                        }
                     }
 
-                    Text("\(id.engineCode) • \(id.transmissionCode)")
+                    Text(engineTransText)
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(Tema.textoSuave)
                         .lineLimit(1)
@@ -179,36 +194,38 @@ struct CockpitDashboardView: View {
 
                 Spacer()
 
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isVehicleCardExpanded.toggle()
+                if isConnected {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isVehicleCardExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 8, height: 8)
+                            Text("Ficha ECU")
+                                .font(.caption2.weight(.bold))
+                            Image(systemName: isVehicleCardExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundStyle(Tema.texto)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Tema.fundo, in: Capsule())
                     }
-                } label: {
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: 8, height: 8)
-                        Text("Ficha ECU")
-                            .font(.caption2.weight(.bold))
-                        Image(systemName: isVehicleCardExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                    .foregroundStyle(Tema.texto)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(Tema.fundo, in: Capsule())
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
 
             // 2. Status message row
-            Text(store.statusBannerText)
+            Text(isConnected ? store.statusBannerText : "Conecte o scanner vLinker para carregar as informações do veículo e telemetria.")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Tema.textoSuave)
                 .lineLimit(1)
 
             // 3. Expandable details (ECU identity & vehicle history)
-            if isVehicleCardExpanded {
+            if isVehicleCardExpanded && isConnected {
                 VStack(alignment: .leading, spacing: 6) {
                     Divider()
                     IdentityRow(label: "Scanner", value: "\(id.adapterFirmware) (\(id.adapterTier.rawValue))")
@@ -222,7 +239,7 @@ struct CockpitDashboardView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "clock.arrow.circlepath")
-                            Text("Histórico de Veículos Conectados (\(max(1, store.connectedVehiclesHistory.count)))")
+                            Text("Histórico de Veículos Conectados (\(store.connectedVehiclesHistory.count))")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 9, weight: .bold))

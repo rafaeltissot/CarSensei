@@ -289,6 +289,10 @@ public final class CarSenseiStore: ObservableObject {
         UserDefaults.standard.removeObject(forKey: tripAnalysisReportsKey)
 
         // 2. Veículos e falhas
+        vehicleIdentity = VehicleIdentity()
+        UserDefaults.standard.removeObject(forKey: vehicleIdentityKey)
+        statusBannerText = "Aguardando conexão com o scanner vLinker..."
+
         connectedVehiclesHistory.removeAll()
         UserDefaults.standard.removeObject(forKey: vehiclesHistoryKey)
 
@@ -609,6 +613,8 @@ public final class CarSenseiStore: ObservableObject {
     public func disconnect() {
         stopTelemetryLoop()
         bleManager.disconnect()
+        vehicleIdentity = VehicleIdentity()
+        statusBannerText = "Aguardando conexão com o scanner vLinker..."
     }
 
     private func initializeVehicleSession() async {
@@ -1073,7 +1079,11 @@ public final class CarSenseiStore: ObservableObject {
     }
 
     private func loadPersistedState() {
-        let wipeFlagKey = "carsensei.history.wipe.v1.2.0.build4"
+        // Ao abrir desconectado, a tela inicial inicia zerada sem nenhum dado de carro anterior (#120)
+        vehicleIdentity = VehicleIdentity()
+        statusBannerText = "Aguardando conexão com o scanner vLinker..."
+
+        let wipeFlagKey = "carsensei.history.wipe.v1.2.0.build5"
         if !UserDefaults.standard.bool(forKey: wipeFlagKey) {
             UserDefaults.standard.set(true, forKey: wipeFlagKey)
             clearAllAppHistoryAndCounters()
@@ -1108,11 +1118,6 @@ public final class CarSenseiStore: ObservableObject {
         }
 
 
-
-        if let savedIdentityData = UserDefaults.standard.data(forKey: vehicleIdentityKey),
-           let decodedIdentity = try? JSONDecoder().decode(VehicleIdentity.self, from: savedIdentityData) {
-            vehicleIdentity = decodedIdentity
-        }
 
         if let savedKm = UserDefaults.standard.string(forKey: clusterKmSavedKey) {
             clusterKmInputText = savedKm
