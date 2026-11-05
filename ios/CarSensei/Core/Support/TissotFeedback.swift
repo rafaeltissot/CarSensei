@@ -122,6 +122,9 @@ public enum TissotFeedback {
         }
     }
 
+    @MainActor private static var lastManualSendTime: Date?
+    private static let manualCooldownSeconds: TimeInterval = 8
+
     /// Envia um relato. Retorna `.queued` se ficou na fila offline (será reenviado automaticamente).
     @discardableResult
     @MainActor public static func send(
@@ -135,6 +138,13 @@ public enum TissotFeedback {
         includeDiagnostics: Bool = true,
         crashInfo: String? = nil
     ) async -> TissotSendResult {
+        if kind == .report {
+            if let last = lastManualSendTime, Date().timeIntervalSince(last) < manualCooldownSeconds {
+                log("MANUAL_REPORT_COOLDOWN", ["secondsRemaining": manualCooldownSeconds - Date().timeIntervalSince(last)], level: .warning)
+                return .sent
+            }
+            lastManualSendTime = Date()
+        }
         let device = TissotDevice.collect()
         TissotStore.shared.updateDeviceSnapshot(device)
         var payload = TissotPayload.base(device: includeDiagnostics ? device : ["model": device["model"] ?? "", "os": device["os"] ?? ""])
@@ -619,23 +629,20 @@ public struct TissotFeedbackSheet: View {
     @AppStorage("tissot_feedback_contact") private var contact = ""
 
     private let context: String?
-    @State private var category: TissotCategory
+    private let category: TissotCategory
     @State private var message = ""
     @State private var screenshot: UIImage?
-    @State private var attachScreenshot = true
-    @State private var attachDiagnostics = true
     @State private var phase: Phase = .editing
-    @State private var showDetails = false
     @FocusState private var focused: Bool
 
     private enum Phase: Equatable { case editing, sending, sent, queued }
 
     /// - Parameters:
     ///   - context: tela/situação (padrão: última tela marcada com `.tissotScreen`)
-    ///   - category: categoria inicial
+    ///   - category: mantido para compatibilidade (padrão: `.bug`)
     public init(context: String? = nil, category: TissotCategory = .bug) {
         self.context = context
-        _category = State(initialValue: category)
+        self.category = category
         _screenshot = State(initialValue: TissotFeedback.captureScreen())
     }
 
@@ -645,25 +652,16 @@ public struct TissotFeedbackSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Tipo", selection: $category) {
-                        ForEach(TissotCategory.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-                }
-
-                Section {
                     ZStack(alignment: .topLeading) {
                         if message.isEmpty && !voice.isRecording {
-                            Text(placeholder)
+                            Text("Descreva o que aconteceu ou a sua sugestão...")
                                 .foregroundStyle(.tertiary)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)
                                 .allowsHitTesting(false)
                         }
                         TextEditor(text: $message)
-                            .frame(minHeight: 140)
+                            .frame(minHeight: 150)
                             .focused($focused)
                     }
                     Button(action: toggleVoice) {
@@ -673,42 +671,7 @@ public struct TissotFeedbackSheet: View {
                     }
                     .frame(minHeight: 44)
                 } header: {
-                    Text(category == .bug ? "O que aconteceu?" : "Conte para nós")
-                } footer: {
-                    if category == .bug {
-                        Text("Diga o que você estava fazendo, o que esperava e o que aconteceu.")
-                    }
-                }
-
-                Section {
-                    if let screenshot {
-                        Toggle(isOn: $attachScreenshot) {
-                            HStack(spacing: 12) {
-                                Image(uiImage: screenshot)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 36, height: 64)
-                                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(.quaternary))
-                                Text("Anexar captura da tela")
-                            }
-                        }
-                    }
-                    Toggle("Anexar diagnóstico técnico", isOn: $attachDiagnostics)
-                    if attachDiagnostics {
-                        DisclosureGroup("O que é enviado", isExpanded: $showDetails) {
-                            Text("Modelo do aparelho, versão do sistema e do app, rede, bateria, memória, espaço livre, idioma e os últimos \(TissotStore.shared.snapshot().count) eventos técnicos do app. Nenhum dado pessoal, senha ou conteúdo seu é incluído.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    TextField("E-mail para retorno (opcional)", text: $contact)
-                        .keyboardType(.emailAddress)
-                        .textContentType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                } header: {
-                    Text("Anexos")
+                    Text("Como podemos ajudar?")
                 }
 
                 Section {
@@ -719,7 +682,7 @@ public struct TissotFeedbackSheet: View {
                             case .sending: ProgressView()
                             case .sent: Label("Enviado. Obrigado!", systemImage: "checkmark.circle.fill")
                             case .queued: Label("Sem conexão — enviaremos depois", systemImage: "tray.and.arrow.up.fill")
-                            case .editing: Text("Enviar").bold()
+                            case .editing: Text("Enviar relato").bold()
                             }
                             Spacer()
                         }
@@ -743,14 +706,6 @@ public struct TissotFeedbackSheet: View {
                 if voice.isRecording, !text.isEmpty { message = text }
             }
             .onDisappear { voice.cancel() }
-        }
-    }
-
-    private var placeholder: String {
-        switch category {
-        case .bug: return "Ex.: toquei em Buscar e a tela ficou em branco…"
-        case .sugestao: return "Que recurso ou melhoria você gostaria?"
-        case .critica: return "O que está bom e o que pode melhorar?"
         }
     }
 
@@ -782,12 +737,12 @@ public struct TissotFeedbackSheet: View {
                 context: context,
                 source: .app,
                 contact: contact.trimmingCharacters(in: .whitespaces),
-                screenshot: attachScreenshot ? screenshot : nil,
-                includeDiagnostics: attachDiagnostics
+                screenshot: screenshot,
+                includeDiagnostics: true
             )
             UINotificationFeedbackGenerator().notificationOccurred(result == .sent ? .success : .warning)
             phase = result == .sent ? .sent : .queued
-            try? await Task.sleep(nanoseconds: 1_300_000_000)
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
             dismiss()
         }
     }
