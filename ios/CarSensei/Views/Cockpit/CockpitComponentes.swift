@@ -1032,6 +1032,9 @@ struct ConnectedVehiclesHistorySheetView: View {
     @EnvironmentObject var store: CarSenseiStore
     @Environment(\.dismiss) private var dismiss
     @State private var showConfirmClearAll = false
+    @State private var showRenameAlert = false
+    @State private var selectedVIN = ""
+    @State private var renameText = ""
 
     var body: some View {
         NavigationStack {
@@ -1083,6 +1086,16 @@ struct ConnectedVehiclesHistorySheetView: View {
                                 }
                             }
                             .padding(.vertical, 4)
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    selectedVIN = car.vin
+                                    renameText = car.modelDescription
+                                    showRenameAlert = true
+                                } label: {
+                                    Label("Renomear", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
                         }
                         .onDelete { offsets in
                             store.deleteConnectedVehicles(at: offsets)
@@ -1093,13 +1106,13 @@ struct ConnectedVehiclesHistorySheetView: View {
                         Text("Veículos Reconhecidos (\(store.connectedVehiclesHistory.count))")
                         Spacer()
                         if !store.connectedVehiclesHistory.isEmpty {
-                            Text("Deslize para apagar")
+                            Text("Deslize para apagar ou renomear")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 } footer: {
-                    Text("O CarSensei detecta automaticamente o modelo, motor e câmbio pela leitura do chassi (VIN 22 F1 90 / 09 02) e da calibração da injeção ao conectar no carro.")
+                    Text("O CarSensei lê o chassi (VIN) e a injeção diretamente pelo barramento CAN. Deslize para a direita para renomear ou para a esquerda para apagar.")
                 }
             }
             .navigationTitle("Histórico de Veículos")
@@ -1131,6 +1144,15 @@ struct ConnectedVehiclesHistorySheetView: View {
                 Button("Cancelar", role: .cancel) {}
             } message: {
                 Text("Esta ação remove todos os veículos salvos e registros de falhas antigas de outros veículos.")
+            }
+            .alert("Renomear Veículo", isPresented: $showRenameAlert) {
+                TextField("Nome do Veículo", text: $renameText)
+                Button("Salvar") {
+                    store.renameConnectedVehicle(vin: selectedVIN, newName: renameText)
+                }
+                Button("Cancelar", role: .cancel) {}
+            } message: {
+                Text("Defina o nome de exibição deste veículo.")
             }
         }
     }

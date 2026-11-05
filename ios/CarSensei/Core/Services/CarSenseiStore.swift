@@ -158,25 +158,64 @@ public final class CarSenseiStore: ObservableObject {
             calibrationId: vehicleIdentity.calibrationId
         )
         vehicleIdentity.detectedBrandProfile = detected.profile
-        vehicleIdentity.modelDescription = detected.modelName
+        if let custom = savedCustomName(for: vehicleIdentity.vin), !custom.isEmpty {
+            vehicleIdentity.modelDescription = custom
+        } else {
+            vehicleIdentity.modelDescription = detected.modelName
+        }
         vehicleIdentity.engineCode = detected.engineDesc
         vehicleIdentity.transmissionCode = detected.transmissionDesc
-        vehicleIdentity.displacementLiters = savedDisplacement(for: vehicleIdentity.vin) ?? 1.5
+        vehicleIdentity.displacementLiters = savedDisplacement(for: vehicleIdentity.vin) ?? 1.6
         vehicleIdentity.boostObserved = savedBoostObserved(for: vehicleIdentity.vin)
+        liveTelemetry.engineDisplacementLiters = vehicleIdentity.displacementLiters
     }
 
     // MARK: - Ajustes por carro (guardados pelo VIN)
+
+    private let customNameKey = "carsensei.vehicle.custom_name.by.vin.v1"
+    private let displacementKey = "carsensei.displacement.by.vin.v1"
+    private let boostKey = "carsensei.boost.by.vin.v1"
+
+    public func savedCustomName(for vin: String) -> String? {
+        (UserDefaults.standard.dictionary(forKey: customNameKey) as? [String: String])?[vehicleKey(vin)]
+    }
+
+    /// Permite ao usuário nomear livremente o veículo conectado (ex.: "Meu Carro", "Carro de Viagem", "Carro 1").
+    public func setCustomVehicleName(_ name: String) {
+        renameConnectedVehicle(vin: vehicleIdentity.vin, newName: name)
+    }
+
+    /// Renomeia um veículo no histórico e salva o apelido personalizado para o chassi (VIN).
+    public func renameConnectedVehicle(vin: String, newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let norm = vehicleKey(vin)
+
+        if let idx = connectedVehiclesHistory.firstIndex(where: { vehicleKey($0.vin) == norm }) {
+            connectedVehiclesHistory[idx].modelDescription = trimmed
+            if let data = try? JSONEncoder().encode(connectedVehiclesHistory) {
+                UserDefaults.standard.set(data, forKey: vehiclesHistoryKey)
+            }
+        }
+
+        if vehicleKey(vehicleIdentity.vin) == norm {
+            vehicleIdentity.modelDescription = trimmed
+            saveVehicleIdentity()
+        }
+
+        var dict = UserDefaults.standard.dictionary(forKey: customNameKey) ?? [:]
+        dict[norm] = trimmed
+        UserDefaults.standard.set(dict, forKey: customNameKey)
+    }
 
     /// Cilindrada usada só no cálculo de consumo quando o carro não tem sensor MAF. O usuário informa nos Ajustes.
     public func setDisplacementLiters(_ liters: Double) {
         let clamped = min(8.0, max(0.6, (liters * 10).rounded() / 10))
         vehicleIdentity.displacementLiters = clamped
+        liveTelemetry.engineDisplacementLiters = clamped
         perVehicleValues(displacementKey, set: clamped)
         saveVehicleIdentity()
     }
-
-    private let displacementKey = "carsensei.displacement.by.vin.v1"
-    private let boostKey = "carsensei.boost.by.vin.v1"
 
     private func vehicleKey(_ vin: String) -> String {
         OBDUDSParser.normalizedVIN(vin) ?? "sem-vin"
@@ -320,6 +359,11 @@ public final class CarSenseiStore: ObservableObject {
         UserDefaults.standard.removeObject(forKey: batterySnapshotKey)
 
         lastCrankingTest = nil
+
+        // 4. Ajustes e apelidos por veículo
+        UserDefaults.standard.removeObject(forKey: customNameKey)
+        UserDefaults.standard.removeObject(forKey: displacementKey)
+        UserDefaults.standard.removeObject(forKey: boostKey)
     }
 
     // MARK: - Gauge Customization

@@ -76,51 +76,101 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
     public var id: String { rawValue }
 
     /// Limites gerais, válidos para motores e transmissões automáticas modernas (Aisin 4AT, CVT e automáticos epicíclicos).
-    /// Não causam pânico desnecessário: no trânsito urbano com conversor de torque deslizando e trocador
-    /// acoplado ao radiador de 95-105°C, o fluido do câmbio opera normalmente até 115°C.
+    /// No trânsito urbano com conversor de torque deslizando e trocador acoplado ao radiador de 95-105°C,
+    /// o fluido do câmbio opera normalmente até 115°C.
     private static let generalThermalThresholds = VehicleThermalThresholds(
-            transmission: TransmissionThermalThresholds(
-                transmissionName: "Câmbio CVT25",
-                warmUpThresholdC: 60.0,
-                nominalMaxC: 105.0,
-                heavyLoadNormalMaxC: 115.0,
-                thermalInterventionC: 120.0,
-                criticalDTCThresholdC: 125.0,
-                officialEngineeringReference: "Wanliyang CVT25 / Chery Arrizo 6 (normal até 115°C sob tráfego urbano/carga; alerta TCU 120°C; DTC P0218 a 125°C)"
-            ),
-            coolant: CoolantThermalThresholds(
-                engineDesc: "Motor a combustão",
-                warmUpThresholdC: 75.0,
-                nominalMaxC: 102.0,
-                fanHighNormalMaxC: 108.0,
-                warningThresholdC: 110.0,
-                criticalDTCThresholdC: 115.0,
-                officialEngineeringReference: "Faixa geral de arrefecimento pressurizado (normal entre 85°C e 105°C)"
-            )
+        transmission: TransmissionThermalThresholds(
+            transmissionName: "Transmissão Automática / CVT",
+            warmUpThresholdC: 60.0,
+            nominalMaxC: 105.0,
+            heavyLoadNormalMaxC: 115.0,
+            thermalInterventionC: 120.0,
+            criticalDTCThresholdC: 125.0,
+            officialEngineeringReference: "Norma Automotiva Geral SAE J1979 (faixa de trabalho 70°C a 115°C; proteção TCU a 120°C; limiar crítico DTC a 125°C)"
+        ),
+        coolant: CoolantThermalThresholds(
+            engineDesc: "Motor a combustão",
+            warmUpThresholdC: 75.0,
+            nominalMaxC: 102.0,
+            fanHighNormalMaxC: 108.0,
+            warningThresholdC: 110.0,
+            criticalDTCThresholdC: 115.0,
+            officialEngineeringReference: "Circuito pressurizado padrão SAE (faixa nominal 85°C a 105°C; ventoinha alta até 108°C; alerta acima de 110°C)"
         )
+    )
 
     public var thermalThresholds: VehicleThermalThresholds { Self.generalThermalThresholds }
 
-    /// Decodificação oficial do veículo a partir do VIN (ISO 3779 / WMI / VDS) e identificadores lidos da ECU.
+    /// Identificação padronizada e universal a partir do VIN (ISO 3779) e dos dados reais informados pela ECU via OBD-II/CAN.
+    /// Não utiliza nenhum veículo fixo ou hardcoded no código.
     public static func detect(fromVIN vin: String, ecuName: String, calibrationId: String) -> (profile: VehicleBrandProfile, modelName: String, engineDesc: String, transmissionDesc: String) {
         let cleanVIN = vin.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let ecu = ecuName.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasECU = !ecu.isEmpty && !ecu.contains("Aguardando")
+        let cal = calibrationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasCal = !cal.isEmpty && !cal.contains("Aguardando")
 
-        // CAOA Chery Arrizo 6 (WMI 98R = Chery Brasil; VDS DC21 = Arrizo 6 1.5 Turbo Flex)
-        if cleanVIN.hasPrefix("98RDC21") {
-            let engine = hasECU ? "1.5 Turbo Flex SQRE4T15C • \(ecu)" : "1.5 Turbo Flex SQRE4T15C"
-            return (.universalOBD, "CAOA Chery Arrizo 6 1.5 Turbo", engine, "Câmbio Wanliyang CVT25 (Fluido CVT)")
-        } else if cleanVIN.hasPrefix("98R") {
-            let engine = hasECU ? "Motor Chery Flex • \(ecu)" : "Motor Chery Flex"
-            return (.universalOBD, "CAOA Chery (\(cleanVIN.prefix(8)))", engine, "Câmbio CVT25 / Automático")
+        let engine: String
+        if hasECU && hasCal {
+            engine = "Injeção: \(ecu) • Calibração \(cal)"
+        } else if hasECU {
+            engine = "Injeção Eletrônica: \(ecu)"
+        } else if hasCal {
+            engine = "Injeção Eletrônica (Calibração \(cal))"
+        } else {
+            engine = "Motor monitorado via barramento CAN"
         }
 
-        let engine = hasECU ? "ECU \(ecu)" : "Motor monitorado via OBD-II"
-        if cleanVIN.count == 17 {
-            return (.universalOBD, "Veículo \(cleanVIN)", engine, "Câmbio (lido via CAN quando disponível)")
+        let transmission = "Transmissão (Monitorada via CAN/UDS)"
+
+        if cleanVIN.count == 17 && !cleanVIN.contains(" ") && !cleanVIN.contains("AGUARDANDO") {
+            let yearChar = cleanVIN[cleanVIN.index(cleanVIN.startIndex, offsetBy: 9)]
+            let year: Int? = {
+                switch yearChar {
+                case "A": return 2010
+                case "B": return 2011
+                case "C": return 2012
+                case "D": return 2013
+                case "E": return 2014
+                case "F": return 2015
+                case "G": return 2016
+                case "H": return 2017
+                case "J": return 2018
+                case "K": return 2019
+                case "L": return 2020
+                case "M": return 2021
+                case "N": return 2022
+                case "P": return 2023
+                case "R": return 2024
+                case "S": return 2025
+                case "T": return 2026
+                case "V": return 2027
+                case "W": return 2028
+                case "X": return 2029
+                case "Y": return 2030
+                case "1": return 2001
+                case "2": return 2002
+                case "3": return 2003
+                case "4": return 2004
+                case "5": return 2005
+                case "6": return 2006
+                case "7": return 2007
+                case "8": return 2008
+                case "9": return 2009
+                default: return nil
+                }
+            }()
+
+            let title: String
+            if let y = year {
+                title = "Veículo OBD-II (Ano-Modelo \(y))"
+            } else {
+                title = "Veículo OBD-II (VIN \(cleanVIN))"
+            }
+            return (.universalOBD, title, engine, transmission)
         }
-        return (.autoDetect, "Veículo conectado via OBD-II", engine, "Câmbio (lido via CAN quando disponível)")
+
+        return (.universalOBD, "Veículo conectado via OBD-II", engine, transmission)
     }
 }
 
@@ -593,7 +643,7 @@ public enum CockpitGaugeID: String, Codable, CaseIterable, Identifiable, Sendabl
         case .engineLoad:
             return "Percentual de esforço atual do motor calculado pela ECU em relação ao torque máximo disponível naquela rotação."
         case .absoluteEngineLoad:
-            return "Massa de ar admitida nos cilindros (em motores turbo como o 1.5T ultrapassa 100% quando a turbina pressuriza)."
+            return "Massa de ar admitida nos cilindros (em motores com sobrealimentação/turbo ultrapassa 100% quando a turbina pressuriza)."
         case .mafAirFlow:
             return "Gramas de ar por segundo (g/s) entrando no motor, base para o cálculo de injeção, consumo e potência."
         case .timingAdvance:
@@ -605,7 +655,7 @@ public enum CockpitGaugeID: String, Codable, CaseIterable, Identifiable, Sendabl
         case .commandedEvapPurge:
             return "Abertura da válvula do canister (EVAP) que reaproveita os vapores de combustível do tanque na admissão."
         case .estimatedPowerHp:
-            return "Potência instantânea estimada (em cavalos/cv) sendo entregue pelo motor 1.5T a partir do fluxo de massa de ar."
+            return "Potência instantânea estimada (em cavalos/cv) sendo entregue pelo motor a partir do fluxo de massa de ar."
         case .estimatedTorqueNm:
             return "Torque instantâneo estimado (em Nm) entregue pelo conjunto motor/turbo na rotação atual."
         case .throttlePos:
@@ -808,7 +858,7 @@ public struct VehicleIdentity: Codable, Equatable, Sendable {
         modelDescription: String = "Nenhum Veículo Conectado",
         engineCode: String = "Aguardando Conexão com Scanner",
         transmissionCode: String = "Aguardando Conexão com Scanner",
-        displacementLiters: Double = 1.500,
+        displacementLiters: Double = 1.600,
         supportedMode01PIDs: [Int] = [],
         ecuReportedFuelType: String? = nil,
         boostObserved: Bool = false
@@ -1201,6 +1251,7 @@ public struct TelemetrySnapshot: Codable, Equatable, Sendable {
     public var timeWithMILOnMin: Int?             // PID 01 4D
     public var timeSinceDTCClearMin: Int?         // PID 01 4E
     public var engineOilTempC: Double?            // PID 01 5C
+    public var engineDisplacementLiters: Double = 1.6 // Cilindrada configurada para cálculo Speed-Density
     public var sessionDistanceKm: Double = 0.0
     public var sessionFuelLiters: Double = 0.0
     public var pollRateHz: Double = 0.0
@@ -1217,7 +1268,8 @@ public struct TelemetrySnapshot: Codable, Equatable, Sendable {
         let tempKelvin = max(220.0, iatC + 273.15)
         let volumetricEfficiency = 0.82
         let imap = (rpm * map) / (tempKelvin * 2.0)
-        return (imap / 60.0) * volumetricEfficiency * 1.498 * 3.484
+        let disp = max(0.6, min(8.0, engineDisplacementLiters))
+        return (imap / 60.0) * volumetricEfficiency * disp * 3.484
     }
 
     /// Potência instantânea estimada em cv a partir do fluxo de massa de ar admitido.

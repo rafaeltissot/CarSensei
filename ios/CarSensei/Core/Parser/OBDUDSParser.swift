@@ -346,7 +346,7 @@ public enum OBDUDSParser {
     public static func updateFuelConsumption(
         in snapshot: inout TelemetrySnapshot,
         fuelProfile: FuelTypeProfile,
-        displacementLiters: Double = 1.498,
+        displacementLiters: Double = 1.6,
         elapsedSeconds: Double,
         calibrationFactor: Double = 1.0
     ) {
@@ -638,7 +638,7 @@ public enum OBDUDSParser {
                 failureTypeByteHex: nil,
                 failureTypeDescription: nil,
                 moduleCode: "ECM",
-                moduleName: "Injeção Eletrônica 1.5T (OBD-II)",
+                moduleName: "Injeção Eletrônica (OBD-II)",
                 statusMaskHex: nil,
                 isActiveNow: isActiveMode,
                 isConfirmed: true,

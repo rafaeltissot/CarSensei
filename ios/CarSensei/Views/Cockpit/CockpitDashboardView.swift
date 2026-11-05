@@ -9,6 +9,8 @@ struct CockpitDashboardView: View {
     @State private var showFeedbackSheet = false
     @State private var showVehicleHistorySheet = false
     @State var showFuelFillUpSheet = false
+    @State private var showRenameVehicleAlert = false
+    @State private var vehicleRenameText = ""
 
     @AppStorage("cockpit.card.vehicle.expanded.v2") var isVehicleCardExpanded = false
     @AppStorage("cockpit.card.battery.expanded.v2") var isBatteryCardExpanded = false
@@ -133,6 +135,15 @@ struct CockpitDashboardView: View {
                 MultimediaMirrorDashboardView()
                     .environmentObject(store)
             }
+            .alert("Renomear Veículo", isPresented: $showRenameVehicleAlert) {
+                TextField("Ex: Meu Carro, Carro 1", text: $vehicleRenameText)
+                Button("Salvar") {
+                    store.setCustomVehicleName(vehicleRenameText)
+                }
+                Button("Cancelar", role: .cancel) { }
+            } message: {
+                Text("Defina como você deseja chamar este veículo no painel, viagens e relatórios.")
+            }
         }
         .tissotScreen("Cockpit Principal")
     }
@@ -175,6 +186,19 @@ struct CockpitDashboardView: View {
                                 .padding(.vertical, 2)
                                 .background(isPro ? Color.blue.opacity(0.15) : Color.orange.opacity(0.15), in: Capsule())
                                 .foregroundStyle(isPro ? Color.blue : Color.orange)
+
+                            Button {
+                                vehicleRenameText = id.cleanModelTitle
+                                showRenameVehicleAlert = true
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(Color.blue)
+                                    .padding(4)
+                                    .background(Color.blue.opacity(0.12), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Renomear Veículo")
                         } else {
                             Text("DESCONECTADO")
                                 .font(.system(size: 8.5, weight: .bold))
