@@ -61,14 +61,7 @@ struct CockpitDashboardView: View {
                                 .contentShape(Rectangle())
                         }
 
-                        Button {
-                            showMultimediaMirror = true
-                        } label: {
-                            Label("Multimídia", systemImage: "carplay")
-                                .font(.caption.weight(.bold))
-                                .frame(minHeight: 44)
-                                .contentShape(Rectangle())
-                        }
+                        CarPlayBotaoMultimidia { showMultimediaMirror = true }
                     }
                 }
 
@@ -131,10 +124,7 @@ struct CockpitDashboardView: View {
                 ConnectedVehiclesHistorySheetView()
                     .environmentObject(store)
             }
-            .fullScreenCover(isPresented: $showMultimediaMirror) {
-                MultimediaMirrorDashboardView()
-                    .environmentObject(store)
-            }
+            .carPlayTelaCheia(isPresented: $showMultimediaMirror, store: store)
             .alert("Renomear Veículo", isPresented: $showRenameVehicleAlert) {
                 TextField("Ex: Meu Carro, Carro 1", text: $vehicleRenameText)
                 Button("Salvar") {

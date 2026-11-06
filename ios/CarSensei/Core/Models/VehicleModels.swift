@@ -75,7 +75,7 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
 
     public var id: String { rawValue }
 
-    /// Limites gerais, válidos para motores e transmissões automáticas modernas (Aisin 4AT, CVT e automáticos epicíclicos).
+    /// Limites gerais, válidos para motores e transmissões automáticas modernas (automáticos convencionais e CVT).
     /// No trânsito urbano com conversor de torque deslizando e trocador acoplado ao radiador de 95-105°C,
     /// o fluido do câmbio opera normalmente até 115°C.
     private static let generalThermalThresholds = VehicleThermalThresholds(
@@ -174,7 +174,7 @@ public enum VehicleBrandProfile: String, Codable, CaseIterable, Identifiable, Se
     }
 }
 
-// MARK: - Configurable Cockpit & CarPlay Gauge Identifiers (42 Real CAN/UDS Sensors)
+// MARK: - Configurable Cockpit Gauge Identifiers (42 Real CAN/UDS Sensors)
 
 public enum CockpitGaugeID: String, Codable, CaseIterable, Identifiable, Sendable {
     // 1. Consumo & Viagem
@@ -231,18 +231,6 @@ public enum CockpitGaugeID: String, Codable, CaseIterable, Identifiable, Sendabl
 
     public var id: String { rawValue }
 
-    /// 22 slots padrão do CarPlay (16 pílulas na grade 4x4 à esquerda + 2 mostradores principais e 4 vitais à direita).
-    public static let defaultCarPlaySlots: [CockpitGaugeID] = [
-        // 16 pílulas da grade 4x4 (Slots 0..15)
-        .tripDistance, .tripFuelUsed, .fuelFlowRate, .fuelTrim,
-        .mapBoost, .throttlePos, .intakeAirTemp, .engineLoad,
-        .timingAdvance, .lambdaO2Voltage, .barometricPressure, .fuelTankLevel,
-        .ethanolPercent, .engineRunTime, .tcuOdometer, .distanceSinceDTCClear,
-        // 2 mostradores principais à direita topo (Slots 16..17)
-        .speed, .rpm,
-        // 4 cartões vitais à direita abaixo (Slots 18..21)
-        .cvtTemp, .coolantTemp, .batteryVoltage, .ambientTemp
-    ]
 
     public var title: String {
         switch self {
@@ -291,7 +279,7 @@ public enum CockpitGaugeID: String, Codable, CaseIterable, Identifiable, Sendabl
         }
     }
 
-    public var shortCarPlayLabel: String {
+    public var shortLabel: String {
         switch self {
         case .coolantTemp: return "MOTOR"
         case .cvtTemp: return "CÂMBIO"

@@ -116,9 +116,11 @@ extension CarSenseiStore {
                     status = .attention
                     analysis = "A TCU tem VIN de outro carro: os \(km(tcuKm)) dela não se comparam com o painel."
                 } else if diff > 1500 {
-                    status = .critical
+                    // O DID do câmbio varia entre fabricantes: sozinho ele não reprova o carro. Só vira Alerta
+                    // se outra prova (odômetro SAE, registros de falha, VIN) também reprovar.
+                    status = .attention
                     highestKm = max(highestKm, tcuKm)
-                    analysis = "O câmbio registra \(km(diff)) a mais que o painel. Indica painel com KM reduzido ou painel trocado."
+                    analysis = "O câmbio registra \(km(diff)) a mais que o painel. Pode ser painel com KM reduzido ou trocado, ou este câmbio guardar o dado em outro formato. Só é alerta quando outra prova confirma."
                 } else if diff > 600 {
                     status = .attention
                     highestKm = max(highestKm, tcuKm)

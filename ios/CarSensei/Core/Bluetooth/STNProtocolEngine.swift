@@ -14,9 +14,6 @@ public struct CANTarget: Equatable, Sendable {
     public static let broadcast = CANTarget(tx: "7DF", rx: nil)
     public static let ecm = CANTarget(tx: "7E0", rx: "7E8")
     public static let tcu = CANTarget(tx: "7E1", rx: "7E9")
-    public static let hvac = CANTarget(tx: "744", rx: "74C")
-    public static let hvacB = CANTarget(tx: "750", rx: "758")
-    public static let bdm = CANTarget(tx: "740", rx: "748")
 }
 
 /// Fila serial de comandos para o vLinker MC+ (STN2120) e ELM327 genérico via CoreBluetooth.

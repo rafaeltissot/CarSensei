@@ -57,9 +57,9 @@ struct VerifyParser {
 
         // 3. Identificação genérica: só o que o carro informa, sem tabela de marcas
         let comVin = VehicleBrandProfile.detect(fromVIN: "ABCDE12345FGH6789", ecuName: "ECU-TESTE", calibrationId: "CAL123")
-        assert(comVin.profile == .universalOBD && comVin.modelName.contains("ABCDE12345FGH6789") && comVin.engineDesc.contains("ECU-TESTE"))
+        assert(comVin.profile == .universalOBD && comVin.modelName.contains("2005") && comVin.engineDesc.contains("ECU-TESTE"))
         let semVin = VehicleBrandProfile.detect(fromVIN: "Aguardando Leitura Automática", ecuName: "Aguardando ECU", calibrationId: "")
-        assert(semVin.profile == .autoDetect && !semVin.engineDesc.contains("Aguardando"))
+        assert(semVin.profile == .universalOBD && !semVin.engineDesc.contains("Aguardando"))
 
         // 4. Verify Speed-Density Fuel Consumption & Ethanol Blend calculation
         var snap = TelemetrySnapshot()

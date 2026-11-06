@@ -1,3 +1,4 @@
+#if CARPLAY_ENABLED
 import SwiftUI
 import CarPlay
 import UIKit
@@ -569,7 +570,7 @@ struct MultimediaMirrorDashboardView: View {
         let gauge = slotGauge(at: slotIndex)
         let pres = store.presentation(for: gauge)
         return tripCounterPill(
-            label: gauge.shortCarPlayLabel,
+            label: gauge.shortLabel,
             value: pres.compactText,
             tint: pres.tint
         )
@@ -590,7 +591,7 @@ struct MultimediaMirrorDashboardView: View {
         let gauge = slotGauge(at: slotIndex)
         let pres = store.presentation(for: gauge)
         return livePrimaryGaugeTile(
-            title: gauge.shortCarPlayLabel,
+            title: gauge.shortLabel,
             value: pres.value,
             unit: pres.unit,
             subtitle: pres.subtitle,
@@ -615,7 +616,7 @@ struct MultimediaMirrorDashboardView: View {
         let pres = store.presentation(for: gauge)
         return miniVitalCard(
             icon: gauge.iconName,
-            title: gauge.shortCarPlayLabel,
+            title: gauge.shortLabel,
             value: pres.compactText,
             detail: pres.subtitle,
             tint: pres.tint,
@@ -936,3 +937,4 @@ struct MultimediaMirrorDashboardView: View {
         )
     }
 }
+#endif

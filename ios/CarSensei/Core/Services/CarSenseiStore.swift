@@ -18,9 +18,11 @@ public final class CarSenseiStore: ObservableObject {
     // Detecção automática 100% pelo barramento CAN e histórico de veículos conectados
     @Published public var connectedVehiclesHistory: [ConnectedVehicleRecord] = []
 
-    // Cockpit e CarPlay personalizáveis (substituição por toque longo) e perfil de combustível
+    // Cockpit personalizável (substituição por toque longo) e perfil de combustível
     @Published public var enabledGauges: [CockpitGaugeID] = CockpitGaugeID.allCases
+    #if CARPLAY_ENABLED
     @Published public var carPlaySlotGauges: [CockpitGaugeID] = CockpitGaugeID.defaultCarPlaySlots
+    #endif
     @Published public var selectedFuelProfile: FuelTypeProfile = .autoDetected {
         didSet {
             UserDefaults.standard.set(selectedFuelProfile.rawValue, forKey: fuelProfileKey)
@@ -116,7 +118,6 @@ public final class CarSenseiStore: ObservableObject {
     private var fuelRiseStartedAt: Date?
     let batterySnapshotKey = "carsensei.battery.snapshot.v1"
     private let enabledGaugesKey = "carsensei.enabled.gauges.v1"
-    private let carPlaySlotsKey = "carsensei.carplay.slots.v1"
     private let fuelProfileKey = "carsensei.fuel.profile.v1"
     private let vehicleIdentityKey = "carsensei.vehicle.identity.v1"
     private let vehiclesHistoryKey = "carsensei.vehicles.history.v1"
@@ -125,6 +126,8 @@ public final class CarSenseiStore: ObservableObject {
     private var didRetryVINInSession: Bool = false
     /// Uma captura do hex cru da temperatura do câmbio por sessão (diagnóstico do relato #109).
     private var didLogRawCVTTempOnce: Bool = false
+    /// Leituras seguidas sem resposta do câmbio nos DIDs de temperatura/odômetro; após 3, para de tentar na sessão (carro sem esse DID).
+    private var tcuProbeMisses: Int = 0
     /// Uma reconexão por sessão depois de handshake sem resposta (evita laço de reconectar para sempre).
     private var didReconnectAfterHandshakeTimeout: Bool = false
     /// Início e máximos da viagem atual (para o histórico de viagens).
@@ -403,25 +406,6 @@ public final class CarSenseiStore: ObservableObject {
         saveGaugePreferences()
     }
 
-    /// Substitui um slot específico (0..21) da tela do CarPlay por outro sensor (trocando de lugar caso já esteja em outro slot).
-    public func replaceCarPlaySlot(at index: Int, with newGauge: CockpitGaugeID) {
-        while carPlaySlotGauges.count < CockpitGaugeID.defaultCarPlaySlots.count {
-            carPlaySlotGauges.append(CockpitGaugeID.defaultCarPlaySlots[carPlaySlotGauges.count])
-        }
-        guard carPlaySlotGauges.indices.contains(index) else { return }
-        if let otherIdx = carPlaySlotGauges.firstIndex(of: newGauge), otherIdx != index {
-            carPlaySlotGauges.swapAt(index, otherIdx)
-        } else {
-            carPlaySlotGauges[index] = newGauge
-        }
-        saveCarPlaySlotPreferences()
-    }
-
-    public func resetCarPlaySlotsToDefault() {
-        carPlaySlotGauges = CockpitGaugeID.defaultCarPlaySlots
-        saveCarPlaySlotPreferences()
-    }
-
     /// Detecta abastecimento pela subida do nível do tanque com o carro parado.
     /// A boia não diz quanto entrou, mas diz que entrou — então o app pré-preenche e o usuário só confirma.
     private func considerFuelLevelForFillUp() {
@@ -581,13 +565,6 @@ public final class CarSenseiStore: ObservableObject {
         }
     }
 
-    private func saveCarPlaySlotPreferences() {
-        let rawValues = carPlaySlotGauges.map(\.rawValue)
-        if let data = try? JSONEncoder().encode(rawValues) {
-            UserDefaults.standard.set(data, forKey: carPlaySlotsKey)
-        }
-    }
-
     private func bindBLECallbacks() {
         bleManager.$connectionState
             .receive(on: RunLoop.main)
@@ -687,6 +664,7 @@ public final class CarSenseiStore: ObservableObject {
             vehicleIdentity.adapterTier = handshake.tier
             vehicleIdentity.obdProtocol = handshake.protocolName
             didRetryVINInSession = false
+            tcuProbeMisses = 0
 
             await readVehicleIdentifiersFromCAN()
 
@@ -871,7 +849,7 @@ public final class CarSenseiStore: ObservableObject {
                     // 2.2 Fallback individual rotativo para sensores visíveis ou em análise da viagem (caso a ECU rejeite quadros multi-PID estendidos)
                     let baseGauges: [CockpitGaugeID] = self.isAnalyzingTripSensors
                         ? self.dynamicallySupportedGaugesForCurrentVehicle
-                        : Array(Set(self.carPlaySlotGauges + self.enabledGauges.prefix(8)))
+                        : Array(Set(self.carPlayPolledGauges + self.enabledGauges.prefix(8)))
                     let activeGaugesToPoll = baseGauges.compactMap(\.singlePIDCommand)
                     if !activeGaugesToPoll.isEmpty {
                         let singleCmd = activeGaugesToPoll[cycleCounter % activeGaugesToPoll.count]
@@ -890,8 +868,10 @@ public final class CarSenseiStore: ObservableObject {
                     }
 
                     // 3. vLinker MC+: TCU (temperatura e odômetro do CVT) a cada 5 ciclos
-                    if cycleCounter % 5 == 0 && self.vehicleIdentity.adapterTier.isAdvancedVLinker {
+                    if cycleCounter % 5 == 0 && self.tcuProbeMisses < 3 && self.vehicleIdentity.adapterTier.isAdvancedVLinker {
+                        var tcuAnswered = false
                         if let (cvtResp, _) = try? await self.protocolEngine.execute("22 0B 37", target: .tcu, timeout: 1.2) {
+                            if OBDUDSParser.parseTCUFluidTempC(cvtResp) != nil { tcuAnswered = true }
                             // Uma captura por sessão: sem o hex cru não dá para provar se o byte é o do fluido
                             // e se o offset é -40 (relato #109). Vai no próximo relato enviado.
                             if !self.didLogRawCVTTempOnce {
@@ -919,7 +899,9 @@ public final class CarSenseiStore: ObservableObject {
                            let tcuKm = OBDUDSParser.parseTCUOdometerKm(tcuOdoResp) {
                             self.liveTelemetry.tcuOdometerKm = tcuKm
                             self.recordConnectedVehicleInHistory(odometerKm: tcuKm)
+                            tcuAnswered = true
                         }
+                        self.tcuProbeMisses = tcuAnswered ? 0 : self.tcuProbeMisses + 1
                     }
 
                     // 3.5 Nível do tanque (PID 01 2F) a cada 10 ciclos: muda devagar e é o que detecta abastecimento
@@ -1146,15 +1128,7 @@ public final class CarSenseiStore: ObservableObject {
             if !validos.isEmpty { enabledGauges = validos }
         }
 
-        if let savedCarPlayData = UserDefaults.standard.data(forKey: carPlaySlotsKey),
-           let decodedCarPlay = try? JSONDecoder().decode([String].self, from: savedCarPlayData) {
-            var validSlots = decodedCarPlay.compactMap { CockpitGaugeID(rawValue: $0) }
-            while validSlots.count < CockpitGaugeID.defaultCarPlaySlots.count {
-                let fallback = CockpitGaugeID.defaultCarPlaySlots[validSlots.count]
-                validSlots.append(fallback)
-            }
-            carPlaySlotGauges = Array(validSlots.prefix(CockpitGaugeID.defaultCarPlaySlots.count))
-        }
+        loadCarPlaySlotPreferences()
 
         if let savedFuelRaw = UserDefaults.standard.string(forKey: fuelProfileKey),
            let profile = FuelTypeProfile(rawValue: savedFuelRaw) {

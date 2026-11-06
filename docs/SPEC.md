@@ -55,7 +55,7 @@ São faixas gerais e preventivas; o módulo de cada carro tem as próprias prote
 | Prova | Comando | Tipo | Reprova quando |
 | :--- | :--- | :--- | :--- |
 | VIN entre módulos | `22 F1 90` (motor, câmbio, painel, carroceria) | Identidade | Algum módulo tem VIN diferente (módulo de outro carro) |
-| Odômetro do câmbio | `22 0B 5B` (câmbio `7E1`), quando existe | Absoluta e independente do painel | Câmbio marca mais de 1.500 km acima do painel |
+| Odômetro do câmbio | `22 0B 5B` (câmbio `7E1`), quando existe; o DID varia por fabricante | Independente do painel, mas só confirma (concordância) | Divergência vira **Atenção**; só vira Alerta com outra prova reprovando |
 | Odômetro SAE | `01 A6` (motor) | Confirmação (costuma copiar o painel) | Mais de 1.500 km acima |
 | Distância desde a limpeza | `01 31` (motor) | Limite mínimo | Maior que o KM do painel |
 | KM nos registros de falha | `19 03` + `19 04` (câmbio) | Limite mínimo | Registro com KM acima do painel |

@@ -645,7 +645,7 @@ struct SensorReplacementSheetView: View {
             let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let matchesSearch = q.isEmpty
                 || gauge.title.lowercased().contains(q)
-                || gauge.shortCarPlayLabel.lowercased().contains(q)
+                || gauge.shortLabel.lowercased().contains(q)
                 || gauge.summaryDescription.lowercased().contains(q)
                 || gauge.pidBadge.lowercased().contains(q)
             return matchesCategory && matchesSearch
@@ -828,18 +828,16 @@ struct GaugeCustomizationSheetView: View {
                         }
                     }
                 } header: {
-                    Text("Catálogo Completo (\(CockpitGaugeID.allCases.count) Sensores • Segure um card na Home ou CarPlay para substituir)")
+                    Text("Catálogo Completo (\(CockpitGaugeID.allCases.count) Sensores • Segure um card na Home\(CarPlayRecurso.ativo ? " ou CarPlay" : "") para substituir)")
                 } footer: {
-                    Text("Dica: Você também pode manter pressionado qualquer sensor na tela inicial do iPhone ou na tela do CarPlay para substituí-lo por outro na hora.")
+                    Text("Dica: Você também pode manter pressionado qualquer sensor na tela inicial do iPhone\(CarPlayRecurso.ativo ? " ou na tela do CarPlay" : "") para substituí-lo por outro na hora.")
                 }
 
                 Section {
                     Button("Exibir Todos os \(CockpitGaugeID.allCases.count) Sensores no App") {
                         store.enableAllGauges()
                     }
-                    Button("Restaurar Layout Padrão do CarPlay (22 Slots)") {
-                        store.resetCarPlaySlotsToDefault()
-                    }
+                    CarPlayBotaoRestaurarLayout()
                 }
             }
             .searchable(text: $searchText, prompt: "Buscar sensor ou explicação...")
