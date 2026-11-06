@@ -30,7 +30,6 @@ struct TripAnalysisView: View {
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
-                        vehicleDynamicParametersCard
                         tripControlAndAutoStartCard
 
                         if store.isAnalyzingTripSensors {
@@ -58,6 +57,7 @@ struct TripAnalysisView: View {
             .navigationTitle("Análise da Viagem")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) { ConexaoPilula() }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showFeedbackSheet = true
@@ -79,41 +79,6 @@ struct TripAnalysisView: View {
     }
 
     // MARK: - 1. Card de Identificação e Parâmetros Dinâmicos do Veículo
-
-    private var vehicleDynamicParametersCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: "car.badge.gearshape.fill")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(.blue)
-                    .frame(width: 38, height: 38)
-                    .background(Color.blue.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(store.vehicleIdentity.cleanModelTitle)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(Tema.texto)
-                        .lineLimit(1)
-                    Text("Parâmetros carregados dinamicamente do veículo")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.blue)
-                }
-
-                Spacer()
-            }
-
-            Text(store.activeVehicleDynamicParametersSummary)
-                .font(.caption2)
-                .foregroundStyle(Tema.textoSuave)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(14)
-        .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Tema.borda, lineWidth: 1)
-        )
-    }
 
     // MARK: - 2. Card de Controle da Viagem + Chave de Início Automático
 

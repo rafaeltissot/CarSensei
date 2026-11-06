@@ -15,7 +15,6 @@ struct DiagnosticsView: View {
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 16) {
-                        currentVehicleContextBadge
                         scanActionsCard
 
                         if store.isScanningDTCs {
@@ -66,6 +65,7 @@ struct DiagnosticsView: View {
             .navigationTitle("Diagnóstico Inteligente")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) { ConexaoPilula() }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showFeedbackSheet = true
@@ -239,39 +239,6 @@ struct DiagnosticsView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 20)
                 .stroke(Color.orange.opacity(0.4), lineWidth: 1)
-        )
-    }
-
-    private var currentVehicleContextBadge: some View {
-        let cleanVIN = OBDUDSParser.normalizedVIN(store.vehicleIdentity.vin)
-        return HStack(spacing: 10) {
-            Image(systemName: "car.circle.fill")
-                .font(.title3)
-                .foregroundStyle(.blue)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(store.vehicleIdentity.cleanModelTitle)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Tema.texto)
-                    .lineLimit(1)
-                if let vin = cleanVIN {
-                    Text("VIN: \(vin) • Diagnóstico isolado por chassi")
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(Tema.textoSuave)
-                        .lineLimit(1)
-                } else {
-                    Text("Conecte ao carro para filtrar falhas pelo chassi (VIN)")
-                        .font(.caption2)
-                        .foregroundStyle(Tema.textoSuave)
-                        .lineLimit(1)
-                }
-            }
-            Spacer()
-        }
-        .padding(12)
-        .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Tema.borda, lineWidth: 1)
         )
     }
 

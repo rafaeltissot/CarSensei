@@ -13,13 +13,14 @@ struct MainTabView: View {
     @State private var selecionada: Aba = .cockpit
 
     enum Aba: String, CaseIterable, Identifiable {
-        case cockpit, viagem, diagnostico, ajustes
+        case cockpit, sensores, viagem, diagnostico, ajustes
 
         var id: String { rawValue }
 
         var titulo: String {
             switch self {
             case .cockpit: return "Cockpit"
+            case .sensores: return "Sensores"
             case .viagem: return "Viagem"
             case .diagnostico: return "Diagnóstico"
             case .ajustes: return "Ajustes"
@@ -29,6 +30,7 @@ struct MainTabView: View {
         var icone: String {
             switch self {
             case .cockpit: return "gauge.with.dots.needle.67percent"
+            case .sensores: return "speedometer"
             case .viagem: return "waveform.path.ecg.rectangle"
             case .diagnostico: return "stethoscope"
             case .ajustes: return "gearshape.fill"
@@ -42,6 +44,8 @@ struct MainTabView: View {
                 switch selecionada {
                 case .cockpit:
                     CockpitDashboardView()
+                case .sensores:
+                    CockpitDashboardView(modo: .sensores)
                 case .viagem:
                     TripAnalysisView()
                 case .diagnostico:

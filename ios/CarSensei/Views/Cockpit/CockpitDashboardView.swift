@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct CockpitDashboardView: View {
+    /// A mesma tela serve a aba inicial (conexão, consumo, bateria) e a aba Sensores (mostradores).
+    enum Modo { case inicio, sensores }
+    var modo: Modo = .inicio
+
     @EnvironmentObject var store: CarSenseiStore
     @State private var showScannerSheet = false
     @State var showGaugeCustomizationSheet = false
@@ -15,7 +19,6 @@ struct CockpitDashboardView: View {
     @AppStorage("cockpit.card.vehicle.expanded.v2") var isVehicleCardExpanded = false
     @AppStorage("cockpit.card.battery.expanded.v2") var isBatteryCardExpanded = false
     @AppStorage("cockpit.card.fuel.expanded.v2") var isFuelCardExpanded = true
-    @AppStorage("cockpit.card.fuel.history.expanded.v2") var isFuelHistoryExpanded = false
     @AppStorage("cockpit.card.odometer.expanded.v2") var isOdometerCardExpanded = false
     @AppStorage("cockpit.card.gauges.expanded.v2") var isGaugesCardExpanded = true
     @AppStorage("cockpit.gauges.showAll.v2") var showAllGauges = false
@@ -33,24 +36,27 @@ struct CockpitDashboardView: View {
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 14) {
-                        unifiedVehicleConnectionCard
-
-                        customizeGaugesHeader
-                        liveGaugesGrid
-                        fuelEconomyComputerCard
-                        batteryAndVLinkerStandbyCard
-                        odometerForensicsHomeBlock
-                        senseiHealthBanner
+                        if modo == .inicio {
+                            unifiedVehicleConnectionCard
+                            fuelEconomyComputerCard
+                            batteryAndVLinkerStandbyCard
+                            odometerForensicsHomeBlock
+                            senseiHealthBanner
+                        } else {
+                            customizeGaugesHeader
+                            liveGaugesGrid
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 28)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("CarSensei")
+            .navigationTitle(modo == .inicio ? "CarSensei" : "Sensores")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
+                    if modo == .sensores {
                     HStack(spacing: 10) {
                         Button {
                             showGaugeCustomizationSheet = true
@@ -62,6 +68,7 @@ struct CockpitDashboardView: View {
                         }
 
                         CarPlayBotaoMultimidia { showMultimediaMirror = true }
+                    }
                     }
                 }
 
@@ -135,7 +142,7 @@ struct CockpitDashboardView: View {
                 Text("Defina como você deseja chamar este veículo no painel, viagens e relatórios.")
             }
         }
-        .tissotScreen("Cockpit Principal")
+        .tissotScreen(modo == .inicio ? "Cockpit Principal" : "Sensores")
     }
 
     private var statusColor: Color {

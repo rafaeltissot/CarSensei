@@ -283,14 +283,14 @@ extension CockpitDashboardView {
                 }
             } label: {
                 HStack {
-                    Label("CONSUMO & HISTÓRICO DE VIAGENS", systemImage: "fuelpump.circle.fill")
+                    Label("CONSUMO", systemImage: "fuelpump.circle.fill")
                         .font(.caption.weight(.heavy))
                         .foregroundStyle(.green)
                         .tracking(0.7)
 
                     Spacer()
 
-                    Text(t.sessionAverageKmPerLiter.map { String(format: "Média %.1f km/L", $0) } ?? "Viagem em Aberto")
+                    Text(t.sessionAverageKmPerLiter.map { String(format: "Média %.1f km/L", $0) } ?? "Desde o abastecimento")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.green)
 
@@ -302,22 +302,6 @@ extension CockpitDashboardView {
             .buttonStyle(.plain)
 
             if isFuelCardExpanded {
-                HStack {
-                    Spacer()
-                    if t.sessionFuelLiters > 0 || t.sessionDistanceKm > 0 {
-                        Button {
-                            store.resetTripFuelCounters()
-                        } label: {
-                            Label("Salvar & Zerar Viagem", systemImage: "arrow.counterclockwise")
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.green.opacity(0.12), in: Capsule())
-                                .foregroundStyle(.green)
-                        }
-                    }
-                }
-
                 HStack(spacing: 10) {
                     economyMetricBox(
                         title: primaryMetricTitle,
@@ -327,7 +311,7 @@ extension CockpitDashboardView {
                     )
 
                     economyMetricBox(
-                        title: "Média da Viagem Atual",
+                        title: "Média desde o Abastecimento",
                         value: t.sessionAverageKmPerLiter.map { String(format: "%.1f km/L", $0) } ?? "-- km/L",
                         subtitle: String(format: "%.2f km • %.3f L", t.sessionDistanceKm, t.sessionFuelLiters),
                         tint: .teal
@@ -361,7 +345,7 @@ extension CockpitDashboardView {
                                 .frame(width: geo.size.width * pct)
                         }
                     }
-                    .frame(height: 8)
+                    .frame(height: 14)
 
                     HStack {
                         Text("Gasolina E27")
@@ -376,51 +360,13 @@ extension CockpitDashboardView {
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(Tema.textoSuave)
                     }
-                }
-                .padding(10)
-                .background(Tema.fundo, in: RoundedRectangle(cornerRadius: 12))
 
-                // Histórico de Viagens Salvo (recolhido por padrão para tela limpa)
-                DisclosureGroup(isExpanded: $isFuelHistoryExpanded) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if store.tripHistory.isEmpty {
-                            Text("Conecte ao carro e dirija para registrar viagens. Ao zerar a viagem ou desligar o carro, a média é gravada automaticamente aqui.")
-                                .font(.caption2)
-                                .foregroundStyle(Tema.textoSuave)
-                        } else {
-                            ForEach(Array(store.tripHistory.prefix(4))) { trip in
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(trip.endDate.formatted(date: .abbreviated, time: .shortened))
-                                            .font(.caption2.weight(.bold))
-                                            .foregroundStyle(Tema.texto)
-                                        Text(String(format: "%.2f km • %.3f L • %@", trip.distanceKm, trip.fuelLiters, trip.fuelProfile.rawValue))
-                                            .font(.caption2)
-                                            .foregroundStyle(Tema.textoSuave)
-                                    }
-                                    Spacer()
-                                    Text(String(format: "%.1f km/L", trip.avgKmPerLiter))
-                                        .font(.subheadline.weight(.black))
-                                        .foregroundStyle(Color.green)
-                                        .monospacedDigit()
-                                }
-                                .padding(8)
-                                .background(Tema.cartao, in: RoundedRectangle(cornerRadius: 10))
-                            }
-                        }
-                    }
-                    .padding(.top, 6)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "list.clipboard.fill")
-                            .foregroundStyle(Color.green)
-                        Text("Histórico de Viagens Gravadas (\(store.tripHistory.count))")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Tema.texto)
-                        Spacer()
-                    }
+                    Text("Como funciona: o app estima a % de etanol a partir da correção de combustível que a injeção faz (e do sensor de etanol, quando o carro tem). Ela só se ajusta depois de alguns minutos rodando com o motor quente. Se você abastecer em outro posto ou com outra mistura, a leitura muda e leva um tempo para estabilizar. É uma estimativa, não uma análise do combustível.")
+                        .font(.caption2)
+                        .foregroundStyle(Tema.textoSuave)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(10)
+                .padding(12)
                 .background(Tema.fundo, in: RoundedRectangle(cornerRadius: 12))
 
                 // Calibração com abastecimento real: é o que aproxima a média do app da conta do posto.

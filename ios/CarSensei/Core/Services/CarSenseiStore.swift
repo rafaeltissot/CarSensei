@@ -493,6 +493,9 @@ public final class CarSenseiStore: ObservableObject {
 
         litersSinceFillUp = 0
         kmSinceFillUp = 0
+        // Tanque cheio: a média da viagem recomeça daqui e só volta a zerar no próximo "Abasteci".
+        liveTelemetry.sessionDistanceKm = 0
+        liveTelemetry.sessionFuelLiters = 0
         saveFuelSession()
     }
 
@@ -506,41 +509,18 @@ public final class CarSenseiStore: ObservableObject {
     }
 
     public func resetTripFuelCounters() {
-        recordCurrentTripToHistory()
         liveTelemetry.sessionDistanceKm = 0.0
         liveTelemetry.sessionFuelLiters = 0.0
         UserDefaults.standard.set(0.0, forKey: sessionDistanceKey)
         UserDefaults.standard.set(0.0, forKey: sessionFuelKey)
     }
 
+    /// Ao fim da conexão: guarda o retrato da bateria. A média de consumo não vai para histórico, segue até o próximo abastecimento.
     public func recordCurrentTripToHistory() {
-        let dist = liveTelemetry.sessionDistanceKm
-        let fuel = liveTelemetry.sessionFuelLiters
         defer {
             tripStartDate = nil
             tripMaxCoolantC = nil
             tripMaxCvtC = nil
-        }
-        guard dist >= 0.05 && fuel > 0.005 else { return }
-        let avgKml = dist / fuel
-        let start = tripStartDate ?? Date()
-        let duration = Date().timeIntervalSince(start)
-        let record = TripRecord(
-            startDate: start,
-            endDate: Date(),
-            distanceKm: dist,
-            fuelLiters: fuel,
-            avgKmPerLiter: avgKml,
-            fuelProfile: selectedFuelProfile,
-            durationSeconds: duration,
-            avgSpeedKmh: duration > 60 ? dist / (duration / 3600) : nil,
-            maxCoolantTempC: tripMaxCoolantC,
-            maxCvtTempC: tripMaxCvtC
-        )
-        tripHistory.insert(record, at: 0)
-        if tripHistory.count > 30 { tripHistory.removeLast(tripHistory.count - 30) }
-        if let data = try? JSONEncoder().encode(tripHistory) {
-            UserDefaults.standard.set(data, forKey: tripHistoryKey)
         }
 
         if let v = liveTelemetry.batteryVoltage {
@@ -962,6 +942,7 @@ public final class CarSenseiStore: ObservableObject {
             finalizeTripSensorAnalysis(reason: "Carro desligado / Scanner desconectado ao final do trajeto")
         }
         recordCurrentTripToHistory()
+        saveFuelSession()
         telemetryTask?.cancel()
         telemetryTask = nil
         isLivePolling = false
